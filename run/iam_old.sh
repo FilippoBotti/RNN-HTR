@@ -1,4 +1,5 @@
 export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=1
 
 python3 train.py  \
 --max-lr 1e-3 \

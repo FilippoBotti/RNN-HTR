@@ -9,7 +9,7 @@ from timm.models.layers import DropPath, to_2tuple
 from mamba_ssm.ops.selective_scan_interface import selective_scan_fn
 from einops import rearrange, repeat
 import numpy as np
-
+from timm.models.vision_transformer import Mlp, DropPath
 
 NEG_INF = -1000000
 
@@ -216,19 +216,23 @@ class VSSBlockDouble(nn.Module):
         self.drop_path = DropPath(drop_path)
         self.skip_scale= nn.Parameter(torch.ones(hidden_dim))
         self.norm = nn.LayerNorm(hidden_dim)
+        self.ln_2 = nn.LayerNorm(hidden_dim)
+        self.drop_path2 = DropPath(drop_path)
+        self.skip_scale2 = nn.Parameter(torch.ones(hidden_dim))
+        self.mlp = Mlp(in_features=hidden_dim, hidden_features=int(hidden_dim * 4.), act_layer=nn.GELU, drop=0.0)
+
 
 
     def forward(self, input, direction=0):
          # x [B,HW,C]
         B, L, C = input.shape
-        # to match height
+        # input = input.view(B, int(np.sqrt(L)), int(np.sqrt(L)), C).contiguous()  # [B,H,W,C]
         input = input.unsqueeze(2).contiguous()
-      
+        
         x = self.ln_1(input)
         x = input*self.skip_scale + self.drop_path(self.self_attention(x, direction=direction))
+        x = x*self.skip_scale2 + self.drop_path2(self.mlp(self.ln_2(x)))
         x = x.view(B, -1, C).contiguous()
-        # norm here used if there's no channel attention
-        x = self.norm(x)
         x = x.squeeze(2)
         return x
 

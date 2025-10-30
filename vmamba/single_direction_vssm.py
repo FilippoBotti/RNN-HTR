@@ -271,24 +271,14 @@ class VSSBlockSingle(nn.Module):
         self.mlp = Mlp(in_features=hidden_dim, hidden_features=int(hidden_dim * 4.), act_layer=nn.GELU, drop=0.0)
 
 
-    def forward(self, input, style=None, direction=0):
+    def forward(self, input, direction=0):
         # x [B,HW,C]
-        if style is not None:
-            style = rearrange(style, 'l b d -> b l d')
-            rnd = torch.rand(style.shape[1])
-            indexes = torch.argsort(rnd)
-            
-        if self.args is not None and self.args.rnd_style:
-            style = style[:,indexes,:]
-            
         B, L, C = input.shape
         # input = input.view(B, int(np.sqrt(L)), int(np.sqrt(L)), C).contiguous()  # [B,H,W,C]
         input = input.unsqueeze(2).contiguous()
-        if style is not None:
-            style = style.view(B, int(np.sqrt(L)), int(np.sqrt(L)), C).contiguous()  # [B,H,W,C]
-            
+        
         x = self.ln_1(input)
-        x = input*self.skip_scale + self.drop_path(self.self_attention(x, style=style, direction=direction))
+        x = input*self.skip_scale + self.drop_path(self.self_attention(x, direction=direction))
         x = x*self.skip_scale2 + self.drop_path2(self.mlp(self.ln_2(x)))
         x = x.view(B, -1, C).contiguous()
         x = x.squeeze(2)

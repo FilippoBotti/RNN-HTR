@@ -11,7 +11,7 @@ import math
 from vmamba import VSSBlock
 from mamba_ssm import Mamba2
 from vmamba.single_direction_vssm import VSSBlockSingle
-from vmamba.double_direction_vssm import VSSBlockDouble
+from vmamba.double_direction_vssm import VSSBlockDouble, SS2D as SS2D_Double
 from rwkv.rwkv_model import RWKV_Block
 
 

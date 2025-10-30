@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=2
+export CUDA_VISIBLE_DEVICES=1
 
 python3 train.py  \
 --max-lr 1e-3 \
@@ -16,10 +16,10 @@ python3 train.py  \
 --alpha 1 \
 --total-iter 100000 \
 --out-dir /home/botti/checkpoints/htr/iam_old \
---exp-name basic \
---architecture transformer \
---head_type linear \
---mamba_scan_type single \
+--exp-name double_mamba_mlp_bimamba_head \
+--architecture mamba \
+--head_type bimamba \
+--mamba_scan_type double \
 IAM_OLD
 
 # python3 test.py --exp-name iam \

@@ -44,6 +44,8 @@ def get_args_parser():
     parser.add_argument('--max-span-length', default=4, type=int, help='max mask length')
     parser.add_argument('--spacing', default=0, type=int, help='the spacing between two span masks')
     parser.add_argument('--proj', default=8, type=float, help='projection value')
+    parser.add_argument('--attn_drop_rate', default=0., type=float, help='attention drop path rate')
+    parser.add_argument('--drop_path', default=0., type=float, help='drop path rate')
 
     parser.add_argument('--dpi-min-factor', default=0.5,type=float)
     parser.add_argument('--dpi-max-factor', default=1.5, type=float)

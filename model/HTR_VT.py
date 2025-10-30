@@ -246,6 +246,8 @@ class MaskedAutoencoderViT(nn.Module):
                         ssm_init="v2",
                         forward_type="v3",
                         num_patches=self.num_patches,
+                        drop_path=args.drop_path,
+                        attn_drop_rate=args.attn_drop_rate,
                     )
                 for _ in range(depth)])
             elif args.mamba_scan_type == 'double':
@@ -258,6 +260,8 @@ class MaskedAutoencoderViT(nn.Module):
                         ssm_init="v2",
                         forward_type="v3",
                         num_patches=self.num_patches,
+                        drop_path=args.drop_path,
+                        attn_drop_rate=args.attn_drop_rate,
                     )
                 for _ in range(depth)])
             elif args.mamba_scan_type == 'quad':
@@ -270,6 +274,8 @@ class MaskedAutoencoderViT(nn.Module):
                         ssm_init="v2",
                         forward_type="v3",
                         num_patches=self.num_patches,
+                        drop_path=args.drop_path,
+                        attn_drop_rate=args.attn_drop_rate,
                     )
                 for _ in range(depth)])
         elif args.architecture == 'rwkv':
@@ -301,6 +307,8 @@ class MaskedAutoencoderViT(nn.Module):
                             forward_type="v3",
                             scan_mode="uni",
                             num_patches=self.num_patches,
+                            drop_path=args.drop_path,
+                            attn_drop_rate=args.attn_drop_rate,
                         ))
                     elif args.mamba_scan_type == 'double':
                         layers.append(VSSBlockDouble(
@@ -312,6 +320,8 @@ class MaskedAutoencoderViT(nn.Module):
                             forward_type="v3",
                             scan_mode="bi",
                             num_patches=self.num_patches,
+                            drop_path=args.drop_path,
+                            attn_drop_rate=args.attn_drop_rate,
                         ))
                     elif args.mamba_scan_type == 'quad':
                         layers.append(VSSBlock(
@@ -323,6 +333,8 @@ class MaskedAutoencoderViT(nn.Module):
                             forward_type="v3",
                             scan_mode="quad",
                             num_patches=self.num_patches,
+                            drop_path=args.drop_path,
+                            attn_drop_rate=args.attn_drop_rate,
                         ))
                 else:
                     layers.append(Block(

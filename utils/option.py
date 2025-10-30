@@ -21,7 +21,7 @@ def get_args_parser():
 
     parser.add_argument('--out-dir', type=str, default='./output', help='output directory')
     parser.add_argument('--train-bs', default=8, type=int, help='train batch size')
-    parser.add_argument('--architecture', type=str, choices=['mamba', 'transformer', 'rwkv', 'hybrid'], default='mamba', help='Use mamba, transformer, or RWKV architecture')
+    parser.add_argument('--architecture', type=str, choices=['mamba', 'transformer', 'rwkv', 'hybrid', 'xlstm'], default='mamba', help='Use mamba, transformer, or RWKV architecture')
     parser.add_argument('--val-bs', default=1, type=int, help='validation batch size')
     parser.add_argument('--num-workers', default=8, type=int, help='nb of workers')
     parser.add_argument('--eval-iter', default=1000, type=int, help='nb of iterations to run evaluation')

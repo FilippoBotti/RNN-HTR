@@ -13,7 +13,7 @@ from mamba_ssm import Mamba2
 from vmamba.single_direction_vssm import VSSBlockSingle
 from vmamba.double_direction_vssm import VSSBlockDouble, SS2D as SS2D_Double
 from rwkv.rwkv_model import RWKV_Block
-
+from xlstm.vision_xlstm import SequenceTraversal, ViLBlock
 
 class BiMambaHead(nn.Module):
     """BiMamba head for sequence modeling"""
@@ -274,9 +274,13 @@ class MaskedAutoencoderViT(nn.Module):
                 for _ in range(depth)])
         elif args.architecture == 'rwkv':
             self.blocks = nn.ModuleList([
-                RWKV_Block(n_embd=768, n_head=8, n_layer=12, layer_id=i, patch_resolution=self.grid_size, shift_mode='q_shift_multihead', shift_pixel=1,
+                RWKV_Block(n_embd=embed_dim, n_head=num_heads, n_layer=12, layer_id=i, patch_resolution=self.grid_size, shift_mode='q_shift_multihead', shift_pixel=1,
                           drop_path=0.1, hidden_rate=4, init_mode='fancy', init_values=0.1,
                           post_norm=False, key_norm=False, with_cls_token=False, with_cp=False)
+            for i in range(depth)])
+        elif args.architecture == 'xlstm':
+            self.blocks = nn.ModuleList([
+                ViLBlock(dim=embed_dim, direction=SequenceTraversal.ROWWISE_FROM_TOP_LEFT)
             for i in range(depth)])
         elif args.architecture == 'transformer':
             self.blocks = nn.ModuleList([

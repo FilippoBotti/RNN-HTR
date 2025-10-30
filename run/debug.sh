@@ -1,7 +1,7 @@
 export CUDA_VISIBLE_DEVICES=3
 python3 train.py  \
 --max-lr 1e-3 \
---train-bs 128 \
+--train-bs 4 \
 --val-bs 8 \
 --weight-decay 0.5 \
 --mask-ratio 0.4 \
@@ -16,7 +16,7 @@ python3 train.py  \
 --total-iter 100000 \
 --out-dir /home/botti/checkpoints/htr/tmp \
 --exp-name tmp \
---architecture mamba \
---head_type bimamba \
+--architecture xlstm \
+--head_type linear \
 --mamba_scan_type single \
 LAM

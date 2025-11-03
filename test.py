@@ -43,7 +43,7 @@ def main():
     model.load_state_dict(model_dict, strict=True)
     model = model.cuda()
 
-    if args.subcommand in ['READ', 'IAM']:
+    if args.subcommand in ['READ', 'IAM_OLD']:
         logger.info('Loading test loader...')
         train_dataset = dataset.myLoadDS(args.train_data_list, args.data_path, args.img_size)
 

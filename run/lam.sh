@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=2
+# export CUDA_VISIBLE_DEVICES=1
 # python3 train.py  \
 # --max-lr 1e-3 \
 # --train-bs 128 \
@@ -15,8 +15,8 @@ export CUDA_VISIBLE_DEVICES=2
 # --alpha 1 \
 # --total-iter 100000 \
 # --out-dir /home/botti/checkpoints/htr/lam \
-# --exp-name single_mlp_mamba_transf_bilstm_collate \
-# --architecture mamba \
+# --exp-name no_sam_bimamba \
+# --architecture bidimamba \
 # --head_type bilstm \
 # --mamba_scan_type single \
 # LAM
@@ -37,8 +37,8 @@ python3 test.py --exp-name lam \
 --alpha 1 \
 --total-iter 100000 \
 --out-dir /home/botti/checkpoints/htr/lam \
---exp-name single_mlp_mamba_transf_bilstm_collate \
---architecture mamba \
+--exp-name no_sam_bimamba \
+--architecture bidimamba \
 --head_type bilstm \
 --mamba_scan_type single \
 LAM

@@ -1,5 +1,4 @@
-export CUDA_VISIBLE_DEVICES=1
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=3
 
 python3 train.py  \
 --max-lr 1e-3 \
@@ -16,12 +15,13 @@ python3 train.py  \
 --proba 0.5 \
 --alpha 1 \
 --total-iter 100000 \
---out-dir /home/botti/checkpoints/htr/iam_old \
---exp-name double_mamba_mlp_bimamba_head \
---architecture mamba \
---head_type bimamba \
+--out-dir /home/botti/checkpoints/htr/iam_bidimamba \
+--exp-name no_sam_bimamba_bidimamba \
+--architecture bidimamba \
+--head_type bidimamba \
 --mamba_scan_type double \
 IAM_OLD
+
 
 # python3 test.py --exp-name iam \
 # --max-lr 1e-3 \
@@ -38,9 +38,9 @@ IAM_OLD
 # --proba 0.5 \
 # --alpha 1 \
 # --total-iter 100000 \
-# --out-dir /home/botti/checkpoints/htr/iam \
-# --exp-name pretrained \
-# --architecture transformer \
-# --head_type linear \
+# --out-dir /home/botti/checkpoints/htr/iam_old \
+# --exp-name bimamba_lr_fisso \
+# --architecture bidimamba \
+# --head_type bilstm \
 # --mamba_scan_type single \
-# IAM
+# IAM_OLD

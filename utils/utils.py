@@ -58,6 +58,15 @@ def update_lr_cos(nb_iter, warm_up_iter, total_iter, max_lr, optimizer, min_lr=1
 #     for g in optimizer.param_groups:
 #         g["lr"] = current_lr
 #     return optimizer, current_lr
+# def update_lr_cos(nb_iter, warm_up_iter, total_iter, max_lr, optimizer, min_lr=1e-7):
+#     if nb_iter < warm_up_iter:
+#         current_lr = max_lr * (nb_iter + 1) / (warm_up_iter + 1)
+#     else:
+#         progress = (nb_iter - warm_up_iter) / max(1, total_iter - warm_up_iter)
+#         current_lr = min_lr + 0.5 * (max_lr - min_lr) * (1 + math.cos(math.pi * progress))
+#     for g in optimizer.param_groups:
+#         g["lr"] = current_lr
+#     return optimizer, current_lr
 
 class CTCLabelConverter(object):
     def __init__(self, character):

@@ -76,8 +76,10 @@ def main():
                                                 shuffle=False,
                                                 pin_memory=True,
                                                 num_workers=args.num_workers)
-        # optimizer = sam.SAM(model.parameters(), torch.optim.AdamW, lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-7, betas=(0.9, 0.99), weight_decay=args.weight_decay)
+        if args.use_sam:
+            optimizer = sam.SAM(model.parameters(), torch.optim.AdamW, lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
+        else:
+            optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
         criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True)
         converter = utils.CTCLabelConverter(train_dataset.ralph.values())
         
@@ -96,7 +98,10 @@ def main():
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.val_bs, shuffle=False, pin_memory=True,
                                                num_workers=args.num_workers)
         # optimizer = sam.SAM(model.parameters(), torch.optim.AdamW, lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-7, betas=(0.9, 0.99), weight_decay=args.weight_decay)
+        if args.use_sam:
+            optimizer = sam.SAM(model.parameters(), torch.optim.AdamW, lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
+        else:
+            optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
         criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True)
         converter = utils.CTCLabelConverter(train_dataset.charset)
     elif args.subcommand == 'IAM':
@@ -129,7 +134,10 @@ def main():
                                                 shuffle=False,
                                                 pin_memory=True,
                                                 num_workers=args.num_workers)
-        optimizer = sam.SAM(model.parameters(), torch.optim.AdamW, lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
+        if args.use_sam:
+            optimizer = sam.SAM(model.parameters(), torch.optim.AdamW, lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
+        else:
+            optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
         criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True)
         converter = utils.CTCLabelConverter(build_charset(formatter))
         
@@ -145,7 +153,10 @@ def main():
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.val_bs, shuffle=False, pin_memory=True,
                                                num_workers=args.num_workers)
         
-        optimizer = sam.SAM(model.parameters(), torch.optim.AdamW, lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
+        if args.use_sam:
+            optimizer = sam.SAM(model.parameters(), torch.optim.AdamW, lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
+        else:
+            optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
         criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True)
         converter = utils.CTCLabelConverter(train_dataset.charset)
     elif args.subcommand == 'RIMES':
@@ -157,7 +168,10 @@ def main():
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.val_bs, shuffle=False, pin_memory=True,
                                  drop_last=False, num_workers=args.num_workers)
         # optimizer = sam.SAM(model.parameters(), torch.optim.AdamW, lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-7, betas=(0.9, 0.99), weight_decay=args.weight_decay)
+        if args.use_sam:
+            optimizer = sam.SAM(model.parameters(), torch.optim.AdamW, lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
+        else:
+            optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
         test_dataset = build_RIMES(image_set='test', dataset_path=args.data_path, args=args) 
         test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.val_bs, shuffle=False, pin_memory=True,
                                  drop_last=False,  num_workers=args.num_workers)
@@ -178,53 +192,46 @@ def main():
 
     #### ---- train & eval ---- ####
 
-    # for nb_iter in tqdm(range(1, args.total_iter)):
-
-    #     optimizer, current_lr = utils.update_lr_cos(nb_iter, args.warm_up_iter, args.total_iter, args.max_lr, optimizer, args.lr)
-
-    #     optimizer.zero_grad()
-    #     batch = next(train_iter)
-    #     #plot the first image in the batch
-    #     # import matplotlib.pyplot as plt
-    #     # plt.imshow(batch[0][0].permute(1,2,0))
-    #     # plt.savefig('./image.png')
-    #     image = batch[0].cuda()
-    #     text, length = converter.encode(batch[1])
-    #     batch_size = image.size(0)
-    #     loss = compute_loss(args, model, image, batch_size, criterion, text, length)
-    #     loss.backward()
-    #     optimizer.first_step(zero_grad=True)
-    #     compute_loss(args, model, image, batch_size, criterion, text, length).backward()
-    #     optimizer.second_step(zero_grad=True)
-    #     model.zero_grad()
-    #     model_ema.update(model, num_updates=nb_iter / 2)
-    #     train_loss += loss.item()
     for nb_iter in tqdm(range(1, args.total_iter)):
+        if args.use_sam:
+            optimizer, current_lr = utils.update_lr_cos(nb_iter, args.warm_up_iter, args.total_iter, args.max_lr, optimizer, args.min_lr)
+            optimizer.zero_grad()
+            batch = next(train_iter)
+            image = batch[0].cuda()
+            text, length = converter.encode(batch[1])
+            batch_size = image.size(0)
+            loss = compute_loss(args, model, image, batch_size, criterion, text, length)
+            loss.backward()
+            optimizer.first_step(zero_grad=True)
+            compute_loss(args, model, image, batch_size, criterion, text, length).backward()
+            optimizer.second_step(zero_grad=True)
+            model.zero_grad()
+            model_ema.update(model, num_updates=nb_iter / 2)
+            train_loss += loss.item()
+        else:
+            optimizer, current_lr = utils.update_lr_cos(nb_iter, args.warm_up_iter, args.total_iter, args.max_lr, optimizer, args.min_lr)
+            optimizer.zero_grad()
+            batch = next(train_iter)
+            image = batch[0].cuda()
 
-        optimizer, current_lr = utils.update_lr_cos(nb_iter, args.warm_up_iter, args.total_iter, args.max_lr, optimizer)
+            text, length = converter.encode(batch[1])
+            batch_size = image.size(0)
 
-        optimizer.zero_grad()
-        batch = next(train_iter)
-        image = batch[0].cuda()
+            preds = model(image, args.mask_ratio, args.max_span_length, use_masking=True).float()
+            preds_size = torch.IntTensor([preds.size(1)] * batch_size).cuda()
+            preds = preds.permute(1, 0, 2).log_softmax(2)
 
-        text, length = converter.encode(batch[1])
-        batch_size = image.size(0)
+            # To avoid ctc_loss issue, disabled cudnn for the computation of the ctc_loss
+            torch.backends.cudnn.enabled = False
+            loss = criterion(preds, text.cuda(), preds_size, length.cuda()).mean()
+            torch.backends.cudnn.enabled = True
+            loss.backward()
 
-        preds = model(image, args.mask_ratio).float()
-        preds_size = torch.IntTensor([preds.size(1)] * batch_size).cuda()
-        preds = preds.permute(1, 0, 2).log_softmax(2)
+            optimizer.step()
 
-        # To avoid ctc_loss issue, disabled cudnn for the computation of the ctc_loss
-        torch.backends.cudnn.enabled = False
-        loss = criterion(preds, text.cuda(), preds_size, length.cuda()).mean()
-        torch.backends.cudnn.enabled = True
-        loss.backward()
-
-        optimizer.step()
-
-        model.zero_grad()
-        model_ema.update(model, num_updates=nb_iter / 2)
-        train_loss += loss.item()
+            model.zero_grad()
+            model_ema.update(model, num_updates=nb_iter / 2)
+            train_loss += loss.item()
         if nb_iter % args.print_iter == 0:
             train_loss_avg = train_loss / args.print_iter
 

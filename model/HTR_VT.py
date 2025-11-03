@@ -14,6 +14,7 @@ from vmamba.single_direction_vssm import VSSBlockSingle
 from vmamba.double_direction_vssm import VSSBlockDouble, SS2D as SS2D_Double
 from rwkv.rwkv_model import RWKV_Block
 from xlstm.vision_xlstm import SequenceTraversal, ViLBlock
+from vmamba.bidi_mamba import BiMambaBlock, BiMamba
 
 class BiMambaHead(nn.Module):
     """BiMamba head for sequence modeling"""
@@ -256,6 +257,7 @@ class MaskedAutoencoderViT(nn.Module):
                         hidden_dim=embed_dim, 
                         norm_layer=norm_layer,
                         mlp_ratio=mlp_ratio,
+                        d_state=4,
                         use_checkpoint=True,
                         ssm_init="v2",
                         forward_type="v3",
@@ -293,6 +295,19 @@ class MaskedAutoencoderViT(nn.Module):
                 Block(embed_dim, num_heads, self.num_patches,
                       mlp_ratio, qkv_bias=True, norm_layer=norm_layer, args=args)
                 for i in range(depth)])
+        elif args.architecture == 'bidimamba':
+            self.blocks = nn.ModuleList([
+                BiMambaBlock(
+                    dim=embed_dim,
+                    mlp_ratio=mlp_ratio,
+                    drop=0.0,
+                    init_values=None,
+                    drop_path=args.drop_path,
+                    act_layer=nn.GELU,
+                    norm_layer=norm_layer,
+                    args=args
+                )
+            for _ in range(depth)])
         elif args.architecture == 'hybrid':
             layers = []
             for i in range(depth):
@@ -369,7 +384,15 @@ class MaskedAutoencoderViT(nn.Module):
             )
         elif self.head_type == 'linear':
             self.head = torch.nn.Linear(embed_dim, nb_cls)
-        else:   
+        elif self.head_type == 'bidimamba':
+            self.head = nn.Sequential(
+                 BiMamba(
+                    embed_dim,
+                    
+                ),
+                torch.nn.Linear(embed_dim, nb_cls)
+            )
+        else:
             raise ValueError(f"Unsupported head type: {self.head_type}")
 
 

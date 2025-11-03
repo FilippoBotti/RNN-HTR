@@ -32,7 +32,6 @@ class SS2D(nn.Module):
             bias=False,
             device=None,
             dtype=None,
-            is_cross=False,
             args=None,
             **kwargs,
     ):
@@ -47,7 +46,6 @@ class SS2D(nn.Module):
         self.dt_rank = math.ceil(self.d_model / 16) if dt_rank == "auto" else dt_rank
 
         self.in_proj = nn.Linear(self.d_model, self.d_inner * 2, bias=bias, **factory_kwargs)
-        self.in_style_proj = nn.Linear(self.d_model, self.d_inner, bias=bias, **factory_kwargs)
         self.conv2d = nn.Conv2d(
             in_channels=self.d_inner,
             out_channels=self.d_inner,
@@ -59,17 +57,7 @@ class SS2D(nn.Module):
         )
         self.act = nn.SiLU()
 
-        if is_cross:
-            self.style_proj = (
-                    nn.Linear(self.d_inner, (self.dt_rank + self.d_state), bias=False, **factory_kwargs),
-                )
-            self.x_proj = (
-                    nn.Linear(self.d_inner, self.d_state, bias=False, **factory_kwargs),
-                )
-            self.style_proj_weight = nn.Parameter(torch.stack([t.weight for t in self.style_proj], dim=0))  # (K=4, N, inner)
-            del self.style_proj
-        else:
-            self.x_proj = (
+        self.x_proj = (
                 nn.Linear(self.d_inner, (self.dt_rank + self.d_state * 2), bias=False, **factory_kwargs),
             )
         

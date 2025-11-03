@@ -7,7 +7,7 @@ def get_args_parser():
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     
-    parser.add_argument('--head_type', type=str, default='linear', choices=['linear', 'bilstm', 'bimamba'],
+    parser.add_argument('--head_type', type=str, default='linear', choices=['linear', 'bilstm', 'bimamba', 'bidimamba'],
                        help='Head type for the model: linear, bilstm, or bimamba')
     parser.add_argument('--bilstm_hidden_dim', type=int, default=512,
                        help='Hidden dimension for BiLSTM')
@@ -21,7 +21,7 @@ def get_args_parser():
 
     parser.add_argument('--out-dir', type=str, default='./output', help='output directory')
     parser.add_argument('--train-bs', default=8, type=int, help='train batch size')
-    parser.add_argument('--architecture', type=str, choices=['mamba', 'transformer', 'rwkv', 'hybrid', 'xlstm'], default='mamba', help='Use mamba, transformer, or RWKV architecture')
+    parser.add_argument('--architecture', type=str, choices=['mamba', 'transformer', 'rwkv', 'hybrid', 'xlstm', 'bidimamba'], default='mamba', help='Use mamba, transformer, or RWKV architecture')
     parser.add_argument('--val-bs', default=1, type=int, help='validation batch size')
     parser.add_argument('--num-workers', default=8, type=int, help='nb of workers')
     parser.add_argument('--eval-iter', default=1000, type=int, help='nb of iterations to run evaluation')
@@ -29,6 +29,7 @@ def get_args_parser():
     parser.add_argument('--warm-up-iter', default=1000, type=int, help='nb of iterations for warm-up')
     parser.add_argument('--print-iter', default=100, type=int, help='nb of total iterations to print information')
     parser.add_argument('--max-lr', default=1e-3, type=float, help='learning rate')
+    parser.add_argument('--lr', default=1e-7, type=float, help='learning rate')
     parser.add_argument('--weight-decay', default=5e-1, type=float, help='weight decay')
     parser.add_argument('--use-wandb', action='store_true', default=False, help = 'wheteher use wandb, otherwise use tensorboard')
     parser.add_argument('--exp-name',type=str, default='IAM_HTR_ORIGAMI_NET', help='experimental name (save dir will be out_dir + exp_name)')

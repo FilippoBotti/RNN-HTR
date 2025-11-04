@@ -19,7 +19,7 @@ model:
   # One of: single, double, quad
   mamba_scan_type: single
   # Optional boolean toggle used by some model compositions
-  use_mamba: false
+  use_mamba: true
   # Image and patch sizes
   img_size: [512, 64]
   patch_size: [4, 32]

@@ -12,7 +12,7 @@ from vmamba import VSSBlock
 from mamba_ssm import Mamba2
 from vmamba.single_direction_vssm import VSSBlockSingle
 from vmamba.double_direction_vssm import VSSBlockDouble, SS2D as SS2D_Double
-from rwkv.rwkv_model import RWKV_Block
+# from rwkv.rwkv_model import RWKV_Block
 from xlstm.vision_xlstm import SequenceTraversal, ViLBlock
 from vmamba.bidi_mamba import BiMambaBlock, BiMamba
 

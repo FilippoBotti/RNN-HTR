@@ -1,0 +1,8 @@
+name: vmamba
+channels:
+  - https://repo.anaconda.com/pkgs/main
+  - https://repo.anaconda.com/pkgs/r
+dependencies:
+  - python=3.11
+  - libstdcxx-ng
+prefix: /home/botti/miniconda3/envs/vmamba

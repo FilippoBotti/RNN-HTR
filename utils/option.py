@@ -85,6 +85,7 @@ def _apply_config_to_args(cfg: Dict[str, Any], args: argparse.Namespace, frozen_
         ('alpha', t.get('alpha'), 'alpha'),
         ('cos_temp', t.get('cos_temp'), 'cos_temp'),
         ('mask_version', t.get('mask_version'), 'mask_version'),
+        ('use_masking', t.get('use_masking'), 'use_masking'),
     ]:
         if v is not None and dest not in frozen_keys:
             setattr(args, dest, v)

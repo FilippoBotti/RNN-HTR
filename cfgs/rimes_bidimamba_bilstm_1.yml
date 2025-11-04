@@ -1,0 +1,70 @@
+output:
+  out_dir: ./checkpoints/htr/rimes
+  exp_name: rimes_bidimamba_bilstm_1 #dataset_backbonetype_headtype_version
+  use_wandb: false
+
+dataset:
+  name: LAM
+  data_path: ./data/read2016/lines/
+  train_data_list: ./data/read2016/train.ln
+  val_data_list: ./data/read2016/val.ln
+  test_data_list: ./data/read2016/test.ln
+  nb_cls: 166
+
+model:
+  # One of: mamba, transformer, rwkv, hybrid, xlstm, bidimamba
+  architecture: bidimamba
+  # One of: linear, bilstm, bimamba, bidimamba
+  head_type: bilstm
+  # One of: single, double, quad
+  mamba_scan_type: single
+  # Optional boolean toggle used by some model compositions
+  use_mamba: false
+  # Image and patch sizes
+  img_size: [512, 64]
+  patch_size: [4, 32]
+  proj: 8
+  # Regularization
+  attn_drop_rate: 0.0
+  drop_path: 0.0
+  # BiLSTM head params (when head_type=bilstm)
+  bilstm_hidden_dim: 512
+  bilstm_num_layers: 2
+  bilstm_dropout: 0.1
+
+optimizer:
+  # AdamW + optional SAM
+  initial_lr: 1.0e-7
+  max_lr: 1.0e-5
+  min_lr: 1.0e-5
+  weight_decay: 0.5
+  use_sam: false
+
+training:
+  total_iter: 100000
+  warm_up_iter: 1000
+  eval_iter: 1000
+  print_iter: 100
+  seed: 123
+  ema_decay: 0.9999
+  # masking / loss
+  mask_version: 0
+  mask_ratio: 0.4
+  attn_mask_ratio: 0.1
+  max_span_length: 8
+  spacing: 0
+  alpha: 1
+  cos_temp: 8
+
+dataloader:
+  train_bs: 128
+  val_bs: 8
+  num_workers: 8
+
+augmentation:
+  proba: 0.5
+  dila_ero_max_kernel: 2
+  dila_ero_iter: 1
+
+pretrained:
+  path: ""

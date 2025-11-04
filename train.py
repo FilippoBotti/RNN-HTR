@@ -19,6 +19,8 @@ from data.RIMES import build_RIMES
 from data.PONTALTO.pontalto import PONTALTO
 from data.format_iam import IAMDatasetFormatter, IAMDataset, build_charset
 
+import time
+
 def compute_loss(args, model, image, batch_size, criterion, text, length):
     preds = model(image, args.mask_ratio, args.max_span_length, use_masking=True)
     preds = preds.float()
@@ -36,7 +38,7 @@ def main():
     args = option.get_args_parser()
     torch.manual_seed(args.seed)
 
-    args.save_dir = os.path.join(args.out_dir, args.exp_name)
+    args.save_dir = os.path.join(args.out_dir, args.exp_name, time.strftime("%Y-%m-%d_%H-%M-%S"))
     os.makedirs(args.save_dir, exist_ok=True)
 
     logger = utils.get_logger(args.save_dir)

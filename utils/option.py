@@ -1,4 +1,170 @@
 import argparse
+import os
+from typing import Any, Dict
+
+try:
+    import yaml
+except Exception:
+    yaml = None  # PyYAML is listed in req.txt; handle gracefully if missing at runtime
+
+
+def _load_yaml_config(path: str) -> Dict[str, Any]:
+    if path is None:
+        return {}
+    if yaml is None:
+        raise RuntimeError("PyYAML not available. Please install pyyaml or remove --config.")
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Configuration file not found: {path}")
+    with open(path, 'r') as f:
+        return yaml.safe_load(f) or {}
+
+
+def _apply_config_to_args(cfg: Dict[str, Any], args: argparse.Namespace, frozen_keys: set[str] | None = None) -> argparse.Namespace:
+    """Map structured YAML config sections into existing argparse names."""
+    if frozen_keys is None:
+        frozen_keys = set()
+    # model
+    m = cfg.get('model', {}) or {}
+    for k, v, dest in [
+        ('architecture', m.get('architecture'), 'architecture'),
+        ('head_type', m.get('head_type'), 'head_type'),
+        ('mamba_scan_type', m.get('mamba_scan_type'), 'mamba_scan_type'),
+        ('use_mamba', m.get('use_mamba'), 'use_mamba'),
+        ('nb_cls', m.get('nb_cls'), 'nb_cls'),
+        ('img_size', m.get('img_size'), 'img_size'),
+        ('patch_size', m.get('patch_size'), 'patch_size'),
+        ('proj', m.get('proj'), 'proj'),
+        ('attn_drop_rate', m.get('attn_drop_rate'), 'attn_drop_rate'),
+        ('drop_path', m.get('drop_path'), 'drop_path'),
+        ('bilstm_hidden_dim', m.get('bilstm_hidden_dim'), 'bilstm_hidden_dim'),
+        ('bilstm_num_layers', m.get('bilstm_num_layers'), 'bilstm_num_layers'),
+        ('bilstm_dropout', m.get('bilstm_dropout'), 'bilstm_dropout'),
+    ]:
+        if v is not None and dest not in frozen_keys:
+            setattr(args, dest, v)
+
+    # dataset
+    d = cfg.get('dataset', {}) or {}
+    if d.get('name') and not getattr(args, 'subcommand', None):
+        args.subcommand = d.get('name')
+    for k, v, dest in [
+        ('data_path', d.get('data_path'), 'data_path'),
+        ('train_data_list', d.get('train_data_list'), 'train_data_list'),
+        ('val_data_list', d.get('val_data_list'), 'val_data_list'),
+        ('test_data_list', d.get('test_data_list'), 'test_data_list'),
+        ('nb_cls', d.get('nb_cls'), 'nb_cls'),
+    ]:
+        if v is not None and dest not in frozen_keys:
+            setattr(args, dest, v)
+
+    # optimizer
+    o = cfg.get('optimizer', {}) or {}
+    for k, v, dest in [
+        ('max_lr', o.get('max_lr'), 'max_lr'),
+        ('min_lr', o.get('min_lr'), 'min_lr'),
+        ('initial_lr', o.get('initial_lr'), 'lr'),
+        ('weight_decay', o.get('weight_decay'), 'weight_decay'),
+        ('use_sam', o.get('use_sam'), 'use_sam'),
+    ]:
+        if v is not None and dest not in frozen_keys:
+            setattr(args, dest, v)
+
+    # training
+    t = cfg.get('training', {}) or {}
+    for k, v, dest in [
+        ('total_iter', t.get('total_iter'), 'total_iter'),
+        ('warm_up_iter', t.get('warm_up_iter'), 'warm_up_iter'),
+        ('eval_iter', t.get('eval_iter'), 'eval_iter'),
+        ('print_iter', t.get('print_iter'), 'print_iter'),
+        ('seed', t.get('seed'), 'seed'),
+        ('ema_decay', t.get('ema_decay'), 'ema_decay'),
+        ('mask_ratio', t.get('mask_ratio'), 'mask_ratio'),
+        ('attn_mask_ratio', t.get('attn_mask_ratio'), 'attn_mask_ratio'),
+        ('max_span_length', t.get('max_span_length'), 'max_span_length'),
+        ('spacing', t.get('spacing'), 'spacing'),
+        ('alpha', t.get('alpha'), 'alpha'),
+        ('cos_temp', t.get('cos_temp'), 'cos_temp'),
+        ('mask_version', t.get('mask_version'), 'mask_version'),
+    ]:
+        if v is not None and dest not in frozen_keys:
+            setattr(args, dest, v)
+
+    # dataloader
+    dl = cfg.get('dataloader', {}) or {}
+    for k, v, dest in [
+        ('train_bs', dl.get('train_bs'), 'train_bs'),
+        ('val_bs', dl.get('val_bs'), 'val_bs'),
+        ('num_workers', dl.get('num_workers'), 'num_workers'),
+    ]:
+        if v is not None and dest not in frozen_keys:
+            setattr(args, dest, v)
+
+    # augmentation
+    a = cfg.get('augmentation', {}) or {}
+    aug_map = {
+        'proba': 'proba',
+        'dpi_min_factor': 'dpi_min_factor',
+        'dpi_max_factor': 'dpi_max_factor',
+        'perspective_low': 'perspective_low',
+        'perspective_high': 'perspective_high',
+        'elastic_distortion_min_kernel_size': 'elastic_distortion_min_kernel_size',
+        'elastic_distortion_max_kernel_size': 'elastic_distortion_max_kernel_size',
+        'elastic_distortion_max_magnitude': 'elastic_distortion_max_magnitude',
+        'elastic_distortion_min_alpha': 'elastic_distortion_min_alpha',
+        'elastic_distortion_max_alpha': 'elastic_distortion_max_alpha',
+        'elastic_distortion_min_sigma': 'elastic_distortion_min_sigma',
+        'elastic_distortion_max_sigma': 'elastic_distortion_max_sigma',
+        'dila_ero_max_kernel': 'dila_ero_max_kernel',
+        'dila_ero_iter': 'dila_ero_iter',
+        'jitter_contrast': 'jitter_contrast',
+        'jitter_brightness': 'jitter_brightness',
+        'jitter_saturation': 'jitter_saturation',
+        'jitter_hue': 'jitter_hue',
+        'blur_min_kernel': 'blur_min_kernel',
+        'blur_max_kernel': 'blur_max_kernel',
+        'blur_min_sigma': 'blur_min_sigma',
+        'blur_max_sigma': 'blur_max_sigma',
+        'sharpen_min_alpha': 'sharpen_min_alpha',
+        'sharpen_max_alpha': 'sharpen_max_alpha',
+        'sharpen_min_strength': 'sharpen_min_strength',
+        'sharpen_max_strength': 'sharpen_max_strength',
+        'zoom_min_h': 'zoom_min_h',
+        'zoom_max_h': 'zoom_max_h',
+        'zoom_min_w': 'zoom_min_w',
+        'zoom_max_w': 'zoom_max_w',
+    }
+    for k, dest in aug_map.items():
+        if k in a and a[k] is not None and dest not in frozen_keys:
+            setattr(args, dest, a[k])
+
+    # output
+    out = cfg.get('output', {}) or {}
+    if out.get('out_dir') is not None and 'out_dir' not in frozen_keys:
+        args.out_dir = out.get('out_dir')
+    if out.get('exp_name') is not None and 'exp_name' not in frozen_keys:
+        args.exp_name = out.get('exp_name')
+    if out.get('use_wandb') is not None and 'use_wandb' not in frozen_keys:
+        args.use_wandb = out.get('use_wandb')
+
+    # pretrained
+    pt = cfg.get('pretrained', {}) or {}
+    if pt.get('path') and 'pretrained_path' not in frozen_keys:
+        args.pretrained_path = pt.get('path')
+
+    # Fallback: also allow flat, top-level keys to override known argparse attributes.
+    # This makes cfgs flexible: either nested (recommended) or flat.
+    section_keys = {'model', 'dataset', 'optimizer', 'training', 'dataloader', 'augmentation', 'output', 'pretrained'}
+    for k, v in (cfg or {}).items():
+        if k in section_keys:
+            continue
+        if v is None:
+            continue
+        # normalize hyphen-separated keys to argparse-style underscores
+        k_norm = k.replace('-', '_')
+        if hasattr(args, k_norm) and k_norm not in frozen_keys:
+            setattr(args, k_norm, v)
+
+    return args
 
 
 def get_args_parser():
@@ -86,6 +252,9 @@ def get_args_parser():
 
     parser.add_argument('--ema-decay', default=0.9999, type=float, help='Exponential Moving Average (EMA) decay')
     parser.add_argument('--alpha', default=0, type=float, help='kld loss ratio')
+
+    # Optional: config file support
+    parser.add_argument('--config', type=str, default=None, help='Path to YAML configuration file')
 
     subparsers = parser.add_subparsers(title="dataset setting", dest="subcommand")
 
@@ -182,4 +351,24 @@ def get_args_parser():
     
     
 
-    return parser.parse_args()
+    # First parse defaults and CLI to detect explicit CLI overrides
+    defaults = parser.parse_args([])
+    args = parser.parse_args()
+
+    # Keys explicitly provided on CLI (different from defaults) will be frozen
+    frozen_keys = set()
+    for k, v in vars(args).items():
+        if not hasattr(defaults, k):
+            continue
+        dv = getattr(defaults, k)
+        if v != dv:
+            frozen_keys.add(k)
+    # config itself should not be a frozen key for downstream mapping
+    frozen_keys.discard('config')
+
+    # Load and apply config if provided, honoring CLI overrides
+    if getattr(args, 'config', None):
+        cfg = _load_yaml_config(args.config)
+        args = _apply_config_to_args(cfg, args, frozen_keys=frozen_keys)
+
+    return args

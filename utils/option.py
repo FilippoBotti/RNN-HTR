@@ -20,6 +20,7 @@ def get_args_parser():
                        help='Scan type for the model, single for single direction, double for double direction')
 
     parser.add_argument('--out-dir', type=str, default='./output', help='output directory')
+    parser.add_argument('--use-sam', action='store_true', default=False, help='whether to use SAM optimizer')
     parser.add_argument('--train-bs', default=8, type=int, help='train batch size')
     parser.add_argument('--architecture', type=str, choices=['mamba', 'transformer', 'rwkv', 'hybrid', 'xlstm', 'bidimamba'], default='mamba', help='Use mamba, transformer, or RWKV architecture')
     parser.add_argument('--val-bs', default=1, type=int, help='validation batch size')

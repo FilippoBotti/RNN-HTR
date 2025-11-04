@@ -77,7 +77,7 @@ def main():
                                                 pin_memory=True,
                                                 num_workers=args.num_workers)
         # optimizer = sam.SAM(model.parameters(), torch.optim.AdamW, lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-7, betas=(0.9, 0.99), weight_decay=args.weight_decay)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
         criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True)
         converter = utils.CTCLabelConverter(train_dataset.ralph.values())
         
@@ -96,7 +96,7 @@ def main():
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.val_bs, shuffle=False, pin_memory=True,
                                                num_workers=args.num_workers)
         # optimizer = sam.SAM(model.parameters(), torch.optim.AdamW, lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-7, betas=(0.9, 0.99), weight_decay=args.weight_decay)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
         criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True)
         converter = utils.CTCLabelConverter(train_dataset.charset)
     elif args.subcommand == 'IAM':
@@ -157,7 +157,7 @@ def main():
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.val_bs, shuffle=False, pin_memory=True,
                                  drop_last=False, num_workers=args.num_workers)
         # optimizer = sam.SAM(model.parameters(), torch.optim.AdamW, lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-7, betas=(0.9, 0.99), weight_decay=args.weight_decay)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
         test_dataset = build_RIMES(image_set='test', dataset_path=args.data_path, args=args) 
         test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.val_bs, shuffle=False, pin_memory=True,
                                  drop_last=False,  num_workers=args.num_workers)

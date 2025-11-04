@@ -49,6 +49,7 @@ def update_lr_cos(nb_iter, warm_up_iter, total_iter, max_lr, optimizer, min_lr=1
         param_group["lr"] = current_lr
 
     return optimizer, current_lr
+
 # def update_lr_cos(nb_iter, warm_up_iter, total_iter, max_lr, optimizer, min_lr=1e-7):
 #     if nb_iter < warm_up_iter:
 #         current_lr = max_lr * (nb_iter + 1) / (warm_up_iter + 1)

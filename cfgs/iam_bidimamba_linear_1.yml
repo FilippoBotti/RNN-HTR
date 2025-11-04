@@ -48,6 +48,7 @@ training:
   seed: 123
   ema_decay: 0.9999
   # masking / loss
+  use_masking: true
   mask_version: 0
   mask_ratio: 0.4
   attn_mask_ratio: 0.1

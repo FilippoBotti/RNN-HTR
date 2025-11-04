@@ -93,6 +93,51 @@ The structure of the file should be:
 ## 4. Quick Start
 * We provide convenient and comprehensive commands in ./run/ to train and test on different datasets to help researchers reproducing the results of the paper.
 
+## Config-driven runs
+
+You can now launch experiments using modular YAML configs stored under `./cfgs`, named as `{dataset}{architecture}{version}.yml`.
+
+- Sections are organized for clarity and easy extension:
+  - `dataset`: name, paths, splits, nb_cls
+  - `model`: architecture, head_type, mamba_scan_type, img_size, patch_size, proj, regularization
+  - `optimizer`: initial/max/min lr, weight_decay, use_sam
+  - `training`: iters, logging cadence, seeding, EMA, masking/loss knobs
+  - `dataloader`: batch sizes and workers
+  - `augmentation`: probabilities and parameters
+  - `output`: out_dir, exp_name, use_wandb
+  - `pretrained`: path
+
+Base template with all options: `cfgs/_base_all_options.yml`.
+
+You can include it and override selectively using the `includes` key:
+
+```yaml
+# cfgs/my_experiment.yml
+includes:
+  - _base_all_options.yml
+
+dataset:
+  name: READ
+  data_path: ./data/read2016/lines/
+
+model:
+  architecture: bidimamba
+  head_type: bilstm
+  mamba_scan_type: single
+
+output:
+  out_dir: ./checkpoints/htr/read
+  exp_name: my_read_bidimamba_bilstm
+```
+
+Run training with a config (dataset subcommand is inferred from `dataset.name`):
+
+```bash
+python3 train.py --config cfgs/READ_bidimamba_bidimamba_no_sam.yml
+```
+
+The dataset subcommand is inferred from `dataset.name` in the YAML, and all hyperparameters are loaded in `train.py` via `utils/option.py`.
+
 ## 5. Citation
 If our project is helpful for your research, please consider citing :
 ```

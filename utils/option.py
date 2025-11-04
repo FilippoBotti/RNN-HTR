@@ -8,7 +8,6 @@ def get_args_parser():
 
     
     parser.add_argument('--head_type', type=str, default='linear', choices=['linear', 'bilstm', 'bimamba', 'bidimamba'],
-    parser.add_argument('--head_type', type=str, default='linear', choices=['linear', 'bilstm', 'bimamba', 'bidimamba'],
                        help='Head type for the model: linear, bilstm, or bimamba')
     parser.add_argument('--bilstm_hidden_dim', type=int, default=512,
                        help='Hidden dimension for BiLSTM')

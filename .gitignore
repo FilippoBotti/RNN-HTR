@@ -30,6 +30,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+#HPC
+*.slurm
+*.out
+
 # C extensions
 *.so
 

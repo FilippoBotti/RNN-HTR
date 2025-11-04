@@ -43,6 +43,7 @@ def get_args_parser():
     parser.add_argument('--img-size', default=[512, 64], type=int, nargs='+', help='image size')
     parser.add_argument('--attn-mask-ratio', default=0., type=float, help='attention drop_key mask ratio')
     parser.add_argument('--patch-size', default=[4, 32], type=int, nargs='+', help='patch size')
+    parser.add_argument('--mask-version', default=0, type=int, help='mask version used for training (0 = legacy)')
     parser.add_argument('--mask-ratio', default=0.3, type=float, help='mask ratio')
     parser.add_argument('--cos-temp', default=8, type=int, help='cosine similarity classifier temperature')
     parser.add_argument('--max-span-length', default=4, type=int, help='max mask length')

@@ -436,39 +436,89 @@ class MaskedAutoencoderViT(nn.Module):
             mask[:,idx:idx + max_span_length,:] = 0
         return mask
 
-    def random_masking(self, x, mask_ratio, max_span_length):
+    def random_masking(self, x, mask_ratio, max_span_length, masking_version=0):
         """
         Perform per-sample random masking by per-sample shuffling.
         Per-sample shuffling is done by argsort random noise.
         x: [N, L, D], sequence
         """
-        mask = self.generate_span_mask(x, mask_ratio, max_span_length)
-        x_masked = x * mask + (1 - mask) * self.mask_token
-        return x_masked
+        if masking_version == 0:
+            mask = self.generate_span_mask(x, mask_ratio, max_span_length)
+            x_masked = x * mask + (1 - mask) * self.mask_token
 
-    def forward(self, x, mask_ratio=0.0, max_span_length=1, use_masking=False):
+            idx_restore = None
+        elif masking_version == 1:
+            B = x.shape[0]
+            L = x.shape[1]  # Length of sequence including class token
+
+            noise = torch.rand(B, L, device=x.device)  # noise in [0, 1]
+
+            # Sort noise to get indices for masking
+            idx_shuffle = torch.argsort(noise, dim=1)  # ascending order
+            idx_restore = torch.argsort(idx_shuffle, dim=1)  # restore original order
+
+            # Calculate number of tokens to keep
+            len_keep = int(L * (1 - mask_ratio))
+
+            # Keep the first len_keep tokens
+            idx_keep = idx_shuffle[:, :len_keep]
+            x_masked = torch.gather(x, dim=1, index=idx_keep.unsqueeze(-1).repeat(1, 1, self.embed_dim))
+
+            # Create the binary mask (1 is keep, 0 is remove)
+            mask = torch.zeros(B, L, device=x.device)
+            mask.scatter_(1, idx_keep, 1.0)
+        elif masking_version == 2:
+            mask = self.generate_span_mask(x, mask_ratio, max_span_length) #1 = visible, 0 = masked
+            mask_tokens = self.mask_token.repeat(
+                x.shape[0],
+                x.shape[1],
+                1
+            )
+            x_masked = x * mask + (1 - mask) * mask_tokens
+
+            idx_restore = None
+
+        return x_masked, idx_restore, mask
+
+    def forward(self, x, mask_ratio=0.0, max_span_length=1, use_masking=False, masking_version=0):
         # embed patches
         x = self.layer_norm(x)
         x = self.patch_embed(x)
         b, c, w, h = x.shape
         x = x.view(b, c, -1).permute(0, 2, 1)
-        # masking: length -> length * mask_ratio
-        if use_masking:
-            x = self.random_masking(x, mask_ratio, max_span_length)
-        x = x + self.pos_embed
-        # apply Transformer blocks
+        
+        if masking_version == 0 or masking_version == 2:
+            if use_masking:
+                x, _, _ = self.random_masking(x, mask_ratio, max_span_length, masking_version)
+            x = x + self.pos_embed
 
-        for blk in self.blocks:
-            x = blk(x)
-        x = self.norm(x)
+            # apply Transformer blocks
+            for blk in self.blocks:
+                x = blk(x)
+            x = self.norm(x)
+        elif masking_version == 1:
+            x = x + self.pos_embed
+            if use_masking:
+                x, idx_restore, mask = self.random_masking(x, mask_ratio, max_span_length, masking_version)
 
-        # To CTC Loss     
+                for blk in self.blocks:
+                    x = blk(x)
+                x_encoded = self.norm(x)
+
+                mask_tokens = self.mask_token.repeat(
+                    x_encoded.shape[0],
+                    idx_restore.shape[1] - x_encoded.shape[1],
+                    1
+                )
+                x_ = torch.cat([x_encoded, mask_tokens], dim=1) # (B, L + L_mask, D)
+                x = torch.gather(x_, dim=1, index=idx_restore.unsqueeze(-1).repeat(1, 1, x_encoded.shape[2]))  # unshuffle
+
+        # To CTC Loss
         # Apply head (BiLSTM or Linear)
         x = self.head(x)
         # Only apply layer norm if not using BiLSTM (BiLSTM already has proper output)
         if  self.head_type == 'linear':
             x = self.layer_norm(x)
-
 
         return x
 

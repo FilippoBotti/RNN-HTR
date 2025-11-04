@@ -15,7 +15,6 @@
 *.parquet
 
 /run/*
-/cfgs/*
 /data/iam/data/*
 /data/*
 *.pt

@@ -210,7 +210,7 @@ def main():
         text, length = converter.encode(batch[1])
         batch_size = image.size(0)
 
-        preds = model(image, args.mask_ratio).float()
+        preds = model(image, args.mask_ratio, args.max_span_length, use_masking=True).float()
         preds_size = torch.IntTensor([preds.size(1)] * batch_size).cuda()
         preds = preds.permute(1, 0, 2).log_softmax(2)
 

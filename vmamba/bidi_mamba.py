@@ -17,12 +17,14 @@ class BiMamba(nn.Module):
             d_state=d_state,
         )
         
+        self.proj = nn.Linear(input_dim * 2, input_dim)
+        
     def forward(self, x):
         fwd = self.fwd_mamba(x)
         x_flip = x.flip(dims=[1])
         bimamba_out_flip = self.bwd_mamba(x_flip)
         bwd = bimamba_out_flip.flip(dims=[1])
-        output = fwd + bwd
+        output = self.proj(torch.cat([fwd, bwd], dim=-1))
         return output
     
 class BiMambaBlock(nn.Module):

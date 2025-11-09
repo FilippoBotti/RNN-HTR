@@ -207,6 +207,7 @@ def get_args_parser():
     parser.add_argument('--seed', default=123, type=int, help='seed for initializing training. ')
     parser.add_argument('--pretrained_path', default='', type=str, help='If set it will load a pretrained before training')
     parser.add_argument('--use_mamba', default=False, type=bool, help='Use Mamba block (True) or Transformer block (False)')
+    parser.add_argument('--depth', default=4, type=int, help='Depth of the model')
 
     parser.add_argument('--img-size', default=[512, 64], type=int, nargs='+', help='image size')
     parser.add_argument('--attn-mask-ratio', default=0., type=float, help='attention drop_key mask ratio')

@@ -388,9 +388,9 @@ class MaskedAutoencoderViT(nn.Module):
             self.head = nn.Sequential(
                  BiMamba(
                     embed_dim,
-                    
+                    output_dim=nb_cls
                 ),
-                torch.nn.Linear(embed_dim, nb_cls)
+                # torch.nn.Linear(embed_dim, nb_cls)
             )
         else:
             raise ValueError(f"Unsupported head type: {self.head_type}")
@@ -528,7 +528,7 @@ def create_model(nb_cls, img_size, args,**kwargs):
                                  img_size=img_size,
                                  patch_size=(4, 64),
                                  embed_dim=768,
-                                 depth=4,
+                                 depth=args.depth,
                                  num_heads=6,
                                  mlp_ratio=4,
                                  norm_layer=partial(nn.LayerNorm, eps=1e-6),

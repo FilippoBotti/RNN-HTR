@@ -5,7 +5,7 @@ from timm.models.vision_transformer import Mlp, DropPath
 
 class BiMamba(nn.Module):
     """BiMamba head for sequence modeling"""
-    def __init__(self, input_dim, d_state=16,):
+    def __init__(self, input_dim, output_dim=768, d_state=16,):
         super().__init__()
         # BiMamba layer
         self.fwd_mamba = Mamba2(
@@ -17,7 +17,7 @@ class BiMamba(nn.Module):
             d_state=d_state,
         )
         
-        self.proj = nn.Linear(input_dim * 2, input_dim)
+        self.proj = nn.Linear(input_dim * 2, output_dim)
         
     def forward(self, x):
         fwd = self.fwd_mamba(x)

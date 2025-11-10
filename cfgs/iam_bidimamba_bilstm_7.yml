@@ -20,8 +20,8 @@ model:
   mamba_scan_type: single
   # Optional boolean toggle used by some model compositions
   use_mamba: true
-  use_projection_arch: false
-  use_projection_head: false
+  use_bimamba_arch_proj: false
+  use_bimamba_head_proj: false
   # Image and patch sizes
   img_size: [512, 64]
   patch_size: [4, 32]

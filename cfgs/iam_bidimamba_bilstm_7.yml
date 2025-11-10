@@ -1,6 +1,6 @@
 output:
   out_dir: ./checkpoints/htr/iam
-  exp_name: iam_bidimamba_bilstm_5 #dataset_backbonetype_headtype_version
+  exp_name: iam_bidimamba_bilstm_7 #dataset_backbonetype_headtype_version
   use_wandb: false
 
 dataset:

@@ -106,11 +106,19 @@ class BiMambaHead(nn.Module):
 class BiLSTMHead(nn.Module):
     """BiLSTM head for sequence modeling"""
     
-    def __init__(self, input_dim, hidden_dim, num_layers, nb_cls, dropout=0.1, autoregressive_head=False):
+    def __init__(self, 
+                 input_dim, 
+                 hidden_dim, 
+                 num_layers, 
+                 nb_cls, 
+                 dropout=0.1, 
+                 autoregressive_head=False, 
+                 ar_teacher_forcing=True):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
         self.autoregressive_head = autoregressive_head
+        self.ar_teacher_forcing = ar_teacher_forcing
         
         # BiLSTM layer
         self.bilstm = nn.LSTM(
@@ -137,9 +145,13 @@ class BiLSTMHead(nn.Module):
 
             for t in range(steps):
                 # Sample features at timestep t
-                x_t = x[:, t, :]
-                #TODO: provare
-                # x_t = out
+                if self.ar_teacher_forcing:
+                    x_t = x[:, t, :]
+                else:
+                    if t == 0:
+                        x_t = x[:, t, :]
+                    else:
+                        x_t = out.squeeze(1)
 
                 # LSTM step
                 out, h = self.bilstm(x_t.unsqueeze(1), h)
@@ -449,6 +461,7 @@ class MaskedAutoencoderViT(nn.Module):
 
         self.use_autoregressive_decoder = args.use_autoregressive_decoder
         self.autoregressive_head = args.autoregressive_head
+        self.ar_teacher_forcing = args.ar_teacher_forcing
         if self.use_autoregressive_decoder:
             head_out_dim = embed_dim
         else:
@@ -466,6 +479,7 @@ class MaskedAutoencoderViT(nn.Module):
                 nb_cls=head_out_dim,
                 dropout=bilstm_dropout,
                 autoregressive_head=self.autoregressive_head,
+                ar_teacher_forcing=self.ar_teacher_forcing
             )
         elif self.head_type == 'bimamba':
             self.head = BiMambaHead(
@@ -669,9 +683,6 @@ class MaskedAutoencoderViT(nn.Module):
         # Only apply layer norm if not using BiLSTM (BiLSTM already has proper output)
         if self.head_type == 'linear':
             x = self.layer_norm(x)
-
-        #AR decoding
-
 
         return x
 

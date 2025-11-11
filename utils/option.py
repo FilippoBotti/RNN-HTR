@@ -43,6 +43,7 @@ def _apply_config_to_args(cfg: Dict[str, Any], args: argparse.Namespace, frozen_
         ('use_bimamba_arch_proj', m.get('use_bimamba_arch_proj'), 'use_bimamba_arch_proj'),
         ('use_bimamba_head_proj', m.get('use_bimamba_head_proj'), 'use_bimamba_head_proj'),
         ('autoregressive_head', m.get('autoregressive_head', False), 'autoregressive_head'),
+        ('ar_teacher_forcing', m.get('ar_teacher_forcing', True), 'ar_teacher_forcing'),
     ]:
         if v is not None and dest not in frozen_keys:
             setattr(args, dest, v)

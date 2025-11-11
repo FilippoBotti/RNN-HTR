@@ -19,10 +19,11 @@ from vmamba.bidi_mamba import BiMambaBlock, BiMamba
 class BiMambaHead(nn.Module):
     """BiMamba head for sequence modeling"""
     
-    def __init__(self, input_dim, hidden_dim, num_layers, nb_cls, dropout=0.1):
+    def __init__(self, input_dim, hidden_dim, num_layers, nb_cls, use_bimamba_projection, dropout=0.1):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
+        self.use_bimamba_projection = use_bimamba_projection
         
         # BiMamba layer
         self.bimamba = Mamba2(
@@ -31,7 +32,8 @@ class BiMambaHead(nn.Module):
         )
         
         # Final projection layer
-        self.fc = nn.Linear(input_dim, nb_cls)
+        if self.use_bimamba_projection:
+            self.fc = nn.Linear(input_dim, nb_cls)
         
     def forward(self, x):
         # x shape: [batch_size, sequence_length, input_dim]
@@ -41,7 +43,10 @@ class BiMambaHead(nn.Module):
         bimamba_out_flip = self.bimamba(x_flip)
         bimamba_out_flip = bimamba_out_flip.flip(dims=[1])
         # Apply final linear layer
-        output = self.fc(bimamba_out + bimamba_out_flip)
+        if self.use_bimamba_projection:
+            output = self.fc(bimamba_out + bimamba_out_flip)
+        else: 
+            output = bimamba_out + bimamba_out_flip
         # output shape: [batch_size, sequence_length, nb_cls]
         
         return output
@@ -221,6 +226,8 @@ class MaskedAutoencoderViT(nn.Module):
                  num_heads=16,
                  mlp_ratio=4.,
                  norm_layer=nn.LayerNorm,
+                 use_bimamba_arch_proj=False,
+                 use_bimamba_head_proj=False,
                  args=None,
                  **kwargs):
         super().__init__()
@@ -235,6 +242,9 @@ class MaskedAutoencoderViT(nn.Module):
         self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim),
                                       requires_grad=False)  # fixed sin-cos embedding
         # --------------------------------------------------------------------------
+
+        self.use_bimamba_projection = use_bimamba_head_proj
+        self.use_bimamba_arch_proj = use_bimamba_arch_proj
 
         if args.architecture == 'mamba':
             if args.mamba_scan_type == 'single':
@@ -305,6 +315,7 @@ class MaskedAutoencoderViT(nn.Module):
                     drop_path=args.drop_path,
                     act_layer=nn.GELU,
                     norm_layer=norm_layer,
+                    use_bimamba_arch_proj=use_bimamba_arch_proj,
                     args=args
                 )
             for _ in range(depth)])
@@ -380,6 +391,7 @@ class MaskedAutoencoderViT(nn.Module):
                 hidden_dim=embed_dim,
                 num_layers=2,
                 nb_cls=nb_cls,
+                use_bimamba_projection=use_bimamba_projection,
                 dropout=0.1
             )
         elif self.head_type == 'linear':
@@ -426,14 +438,23 @@ class MaskedAutoencoderViT(nn.Module):
                 nn.init.constant_(m.bias, 0)
                 nn.init.constant_(m.weight, 1.0)
 
-    def generate_span_mask(self, x, mask_ratio, max_span_length):
+    def generate_span_mask(self, x, mask_ratio, max_span_length, version=0):
         N, L, D = x.shape  # batch, length, dim
         mask = torch.ones(N, L, 1).to(x.device)
         span_length = int(L * mask_ratio)
-        num_spans = span_length // max_span_length
-        for i in range(num_spans):
-            idx = torch.randint(L - max_span_length, (1,))
-            mask[:,idx:idx + max_span_length,:] = 0
+
+        if version == 3:
+            #masking happens only in the beginnning of the sequence or in the end
+            edge = int(torch.randint(0, 2, (1,), device=x.device).item()) #0 = beginning, 1 = end
+            start_idx = (L - span_length) * edge
+            end_idx = L * edge + span_length * (1-edge)
+            mask[:, start_idx: end_idx] = 0 #0 = mask
+        else:
+            #random spans in the sequence
+            num_spans = span_length // max_span_length
+            for i in range(num_spans):
+                idx = torch.randint(L - max_span_length, (1,))
+                mask[:,idx:idx + max_span_length,:] = 0 #0 = mask
         return mask
 
     def random_masking(self, x, mask_ratio, max_span_length, masking_version=0):
@@ -442,8 +463,8 @@ class MaskedAutoencoderViT(nn.Module):
         Per-sample shuffling is done by argsort random noise.
         x: [N, L, D], sequence
         """
-        if masking_version == 0:
-            mask = self.generate_span_mask(x, mask_ratio, max_span_length)
+        if masking_version == 0 or masking_version == 3:
+            mask = self.generate_span_mask(x, mask_ratio, max_span_length, masking_version)
             x_masked = x * mask + (1 - mask) * self.mask_token
 
             idx_restore = None
@@ -468,7 +489,7 @@ class MaskedAutoencoderViT(nn.Module):
             mask = torch.zeros(B, L, device=x.device)
             mask.scatter_(1, idx_keep, 1.0)
         elif masking_version == 2:
-            mask = self.generate_span_mask(x, mask_ratio, max_span_length) #1 = visible, 0 = masked
+            mask = self.generate_span_mask(x, mask_ratio, max_span_length, masking_version) #1 = visible, 0 = masked
             mask_tokens = self.mask_token.repeat(
                 x.shape[0],
                 x.shape[1],
@@ -486,17 +507,8 @@ class MaskedAutoencoderViT(nn.Module):
         x = self.patch_embed(x)
         b, c, w, h = x.shape
         x = x.view(b, c, -1).permute(0, 2, 1)
-        
-        if masking_version == 0 or masking_version == 2:
-            if use_masking:
-                x, _, _ = self.random_masking(x, mask_ratio, max_span_length, masking_version)
-            x = x + self.pos_embed
 
-            # apply Transformer blocks
-            for blk in self.blocks:
-                x = blk(x)
-            x = self.norm(x)
-        elif masking_version == 1:
+        if masking_version == 1:
             x = x + self.pos_embed
             if use_masking:
                 x, idx_restore, mask = self.random_masking(x, mask_ratio, max_span_length, masking_version)
@@ -512,7 +524,15 @@ class MaskedAutoencoderViT(nn.Module):
                 )
                 x_ = torch.cat([x_encoded, mask_tokens], dim=1) # (B, L + L_mask, D)
                 x = torch.gather(x_, dim=1, index=idx_restore.unsqueeze(-1).repeat(1, 1, x_encoded.shape[2]))  # unshuffle
+        else:
+            if use_masking:
+                x, _, _ = self.random_masking(x, mask_ratio, max_span_length, masking_version)
+            x = x + self.pos_embed
 
+            # apply Transformer blocks
+            for blk in self.blocks:
+                x = blk(x)
+            x = self.norm(x)
         # To CTC Loss
         # Apply head (BiLSTM or Linear)
         x = self.head(x)

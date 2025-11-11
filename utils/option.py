@@ -40,6 +40,8 @@ def _apply_config_to_args(cfg: Dict[str, Any], args: argparse.Namespace, frozen_
         ('bilstm_hidden_dim', m.get('bilstm_hidden_dim'), 'bilstm_hidden_dim'),
         ('bilstm_num_layers', m.get('bilstm_num_layers'), 'bilstm_num_layers'),
         ('bilstm_dropout', m.get('bilstm_dropout'), 'bilstm_dropout'),
+        ('use_bimamba_arch_proj', m.get('use_bimamba_arch_proj'), 'use_bimamba_arch_proj'),
+        ('use_bimamba_head_proj', m.get('use_bimamba_head_proj'), 'use_bimamba_head_proj')
     ]:
         if v is not None and dest not in frozen_keys:
             setattr(args, dest, v)

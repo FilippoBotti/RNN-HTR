@@ -34,6 +34,7 @@ def _apply_config_to_args(cfg: Dict[str, Any], args: argparse.Namespace, frozen_
         ('img_size', m.get('img_size'), 'img_size'),
         ('patch_size', m.get('patch_size'), 'patch_size'),
         ('proj', m.get('proj'), 'proj'),
+        ('depth', m.get('depth'), 'depth'),
         ('attn_drop_rate', m.get('attn_drop_rate'), 'attn_drop_rate'),
         ('drop_path', m.get('drop_path'), 'drop_path'),
         ('bilstm_hidden_dim', m.get('bilstm_hidden_dim'), 'bilstm_hidden_dim'),

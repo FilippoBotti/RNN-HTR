@@ -7,6 +7,7 @@ import numpy as np
 from model import resnet18
 from functools import partial
 import math
+from einops import rearrange
 
 from vmamba import VSSBlock
 from mamba_ssm import Mamba2
@@ -16,14 +17,65 @@ from vmamba.double_direction_vssm import VSSBlockDouble, SS2D as SS2D_Double
 from xlstm.vision_xlstm import SequenceTraversal, ViLBlock
 from vmamba.bidi_mamba import BiMambaBlock, BiMamba
 
+class CrossAttention(nn.Module):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
+        super().__init__()
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+        # NOTE scale factor was wrong in my original version, can set manually to be compat with prev weights
+        self.scale = qk_scale or head_dim ** -0.5
+
+        self.q = nn.Linear(dim, dim, bias=qkv_bias)
+        self.kv = nn.Linear(dim, dim * 2, bias=qkv_bias)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+    def forward(self, q, kv, mask):
+        B, N, C = q.shape
+        q = self.q(q).reshape(B, N, 1, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        kv = self.kv(kv).reshape(B, N, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        q, k, v = q[0], kv[0], kv[1]   # make torchscript happy (cannot use tensor as tuple)
+
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn += mask
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+
+        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
+
+class DecoderBlock(nn.Module):
+
+    def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
+                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm):
+        super().__init__()
+        self. attn2 = CrossAttention(
+            dim, num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale, attn_drop=attn_drop, proj_drop=drop)
+        self.norm2_1 = norm_layer(dim)
+        self.norm2_2 = norm_layer(dim)
+        # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
+        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.norm2 = norm_layer(dim)
+        mlp_hidden_dim = int(dim * mlp_ratio)
+        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
+
+    def forward(self, q, kv, mask):
+        q = q + self.attn2(self.norm2_1(q), self.norm2_2(kv), mask)
+        q = q + self.mlp(self.norm2(q))
+        return q
+
 class BiMambaHead(nn.Module):
     """BiMamba head for sequence modeling"""
     
-    def __init__(self, input_dim, hidden_dim, num_layers, nb_cls, use_bimamba_projection, dropout=0.1):
+    def __init__(self, input_dim, hidden_dim, num_layers, nb_cls, use_bimamba_projection, dropout=0.1, autoregressive_head=False):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
         self.use_bimamba_projection = use_bimamba_projection
+        self.autoregressive_head = autoregressive_head
         
         # BiMamba layer
         self.bimamba = Mamba2(
@@ -54,10 +106,11 @@ class BiMambaHead(nn.Module):
 class BiLSTMHead(nn.Module):
     """BiLSTM head for sequence modeling"""
     
-    def __init__(self, input_dim, hidden_dim, num_layers, nb_cls, dropout=0.1):
+    def __init__(self, input_dim, hidden_dim, num_layers, nb_cls, dropout=0.1, autoregressive_head=False):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
+        self.autoregressive_head = autoregressive_head
         
         # BiLSTM layer
         self.bilstm = nn.LSTM(
@@ -65,21 +118,38 @@ class BiLSTMHead(nn.Module):
             hidden_size=hidden_dim,
             num_layers=num_layers,
             batch_first=True,
-            bidirectional=True,
+            bidirectional = not autoregressive_head,
             dropout=dropout if num_layers > 1 else 0
         )
         
         # Final projection layer
-        self.fc = nn.Linear(hidden_dim * 2, nb_cls)  # *2 for bidirectional
+        effective_embed_dim = hidden_dim * 2 if not autoregressive_head else hidden_dim
+        self.fc = nn.Linear(effective_embed_dim, nb_cls)  # *2 for bidirectional
         
     def forward(self, x):
         # x shape: [batch_size, sequence_length, input_dim]
-        lstm_out, _ = self.bilstm(x)
-        # lstm_out shape: [batch_size, sequence_length, hidden_dim * 2]
+        output = []
+        if self.autoregressive_head:
+            steps = x.shape[1] 
+            h = torch.zeros(self.num_layers, x.shape[0], self.hidden_dim).to(x.device)
+
+            for t in range(steps):
+                # Sample features at timestep t
+                x_t = x[:, t, :]
+                # LSTM step
+                out, h = self.bilstm(x_t, h)
+                # Map hidden to prediction at step t+1
+                y = self.fc(out)
+                output.append(y)
+
+            output = torch.stack(output, dim=1)
+        else:
+            lstm_out, _ = self.bilstm(x)
+            # lstm_out shape: [batch_size, sequence_length, hidden_dim * 2]
         
-        # Apply final linear layer
-        output = self.fc(lstm_out)
-        # output shape: [batch_size, sequence_length, nb_cls]
+            # Apply final linear layer
+            output = self.fc(lstm_out)
+            # output shape: [batch_size, sequence_length, nb_cls]
         
         return output
 
@@ -226,8 +296,6 @@ class MaskedAutoencoderViT(nn.Module):
                  num_heads=16,
                  mlp_ratio=4.,
                  norm_layer=nn.LayerNorm,
-                 use_bimamba_arch_proj=False,
-                 use_bimamba_head_proj=False,
                  args=None,
                  **kwargs):
         super().__init__()
@@ -243,8 +311,8 @@ class MaskedAutoencoderViT(nn.Module):
                                       requires_grad=False)  # fixed sin-cos embedding
         # --------------------------------------------------------------------------
 
-        self.use_bimamba_projection = use_bimamba_head_proj
-        self.use_bimamba_arch_proj = use_bimamba_arch_proj
+        self.use_bimamba_head_proj = args.use_bimamba_head_proj
+        self.use_bimamba_arch_proj = args.use_bimamba_arch_proj
 
         if args.architecture == 'mamba':
             if args.mamba_scan_type == 'single':
@@ -315,7 +383,7 @@ class MaskedAutoencoderViT(nn.Module):
                     drop_path=args.drop_path,
                     act_layer=nn.GELU,
                     norm_layer=norm_layer,
-                    use_bimamba_arch_proj=use_bimamba_arch_proj,
+                    use_bimamba_arch_proj=self.use_bimamba_arch_proj,
                     args=args
                 )
             for _ in range(depth)])
@@ -372,6 +440,13 @@ class MaskedAutoencoderViT(nn.Module):
         self.norm = norm_layer(embed_dim, elementwise_affine=True)
         
         self.head_type = getattr(args, 'head_type', 'linear') if args is not None else 'linear'
+
+        self.use_autoregressive_decoder = args.use_autoregressive_decoder
+        self.autoregressive_head = args.autoregressive_head
+        if self.use_autoregressive_decoder:
+            head_out_dim = embed_dim
+        else:
+            head_out_dim = nb_cls
         # Head configuration: BiLSTM or Linear
         if self.head_type == 'bilstm':
             bilstm_hidden_dim = getattr(args, 'bilstm_hidden_dim', 256)
@@ -382,31 +457,52 @@ class MaskedAutoencoderViT(nn.Module):
                 input_dim=embed_dim,
                 hidden_dim=bilstm_hidden_dim,
                 num_layers=bilstm_num_layers,
-                nb_cls=nb_cls,
-                dropout=bilstm_dropout
+                nb_cls=head_out_dim,
+                dropout=bilstm_dropout,
+                autoregressive_head=self.autoregressive_head,
             )
         elif self.head_type == 'bimamba':
             self.head = BiMambaHead(
                 input_dim=embed_dim,
                 hidden_dim=embed_dim,
                 num_layers=2,
-                nb_cls=nb_cls,
-                use_bimamba_projection=use_bimamba_projection,
-                dropout=0.1
+                nb_cls=head_out_dim,
+                use_bimamba_projection=self.use_bimamba_head_proj,
+                dropout=0.1,
+                autoregressive_head=self.autoregressive_head,
             )
         elif self.head_type == 'linear':
-            self.head = torch.nn.Linear(embed_dim, nb_cls)
+            self.head = torch.nn.Linear(embed_dim, head_out_dim)
         elif self.head_type == 'bidimamba':
             self.head = nn.Sequential(
                  BiMamba(
                     embed_dim,
-                    output_dim=nb_cls
+                    output_dim=head_out_dim
                 ),
                 # torch.nn.Linear(embed_dim, nb_cls)
             )
         else:
             raise ValueError(f"Unsupported head type: {self.head_type}")
 
+        self.use_autoregressive_decoder = args.use_autoregressive_decoder
+        if self.use_autoregressive_decoder:
+            
+            self.dec_embed_dim = args.dec_embed_dim
+            self.ar_token = nn.Parameter(torch.zeros(1, 1, self.dec_embed_dim))
+            self.dec_pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim),
+                                      requires_grad=False)  # fixed sin-cos embedding
+            self.pos_drop = nn.Dropout(p=0.1)
+            self.enc2dec = nn.Linear(embed_dim * 4, self.dec_embed_dim * 4)
+            self.dec_block = nn.ModuleList([
+                DecoderBlock(self.dec_embed_dim, self.dec_embed_dim // 64, 4, qkv_bias=True, qk_scale=None,
+                            norm_layer=nn.LayerNorm)
+                for i in range(4)])
+            self.norm_1 = nn.LayerNorm(embed_dim)
+            self.norm_2 = nn.LayerNorm(embed_dim)
+            self.norm_3 = nn.LayerNorm(embed_dim)
+            self.norm_4 = nn.LayerNorm(embed_dim)
+            self.ar_norm = nn.LayerNorm(self.dec_embed_dim)
+            self.ar_pred = nn.Linear(self.dec_embed_dim, embed_dim)
 
         self.initialize_weights()
 
@@ -424,6 +520,11 @@ class MaskedAutoencoderViT(nn.Module):
         # pos_embed = get_2d_sincos_pos_embed(self.embed_dim, [1, self.nb_query])
         # self.qry_tokens.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
         torch.nn.init.normal_(self.mask_token, std=.02)
+
+        if self.use_autoregressive_decoder:
+            dec_pos_embed = get_2d_sincos_pos_embed(self.dec_embed_dim, self.grid_size)
+            self.dec_pos_embed.data.copy_(torch.from_numpy(dec_pos_embed).float().unsqueeze(0))
+            torch.nn.init.normal_(self.ar_token, std=.02)
 
         # initialize nn.Linear and nn.LayerNorm
         self.apply(self._init_weights)
@@ -444,11 +545,14 @@ class MaskedAutoencoderViT(nn.Module):
         span_length = int(L * mask_ratio)
 
         if version == 3:
-            #masking happens only in the beginnning of the sequence or in the end
-            edge = int(torch.randint(0, 2, (1,), device=x.device).item()) #0 = beginning, 1 = end
-            start_idx = (L - span_length) * edge
-            end_idx = L * edge + span_length * (1-edge)
-            mask[:, start_idx: end_idx] = 0 #0 = mask
+            #masking occurs only in the beginning of the sequence or in the end
+            edges = torch.randint(0, 2, (N,), device=x.device) #0 = beginning, 1 = end
+            
+            start_indices = ((L - span_length) * edges).unsqueeze(1)
+            end_indices = (L * edges + span_length * (1-edges)).unsqueeze(1)
+            
+            positions = torch.arange(L, device=x.device).unsqueeze(0).expand(N, -1).unsqueeze(2)
+            mask = ((positions < start_indices.unsqueeze(1)) | (positions >= end_indices.unsqueeze(1))).float()
         else:
             #random spans in the sequence
             num_spans = span_length // max_span_length
@@ -501,13 +605,33 @@ class MaskedAutoencoderViT(nn.Module):
 
         return x_masked, idx_restore, mask
 
+    def forward_decoder(self, latent_ar, decoder_pos_embed):
+        # embed tokens
+        B, N, C, depth = latent_ar.shape
+
+        ar_token = self.ar_token + decoder_pos_embed
+        H, W = int(np.sqrt(ar_token.shape[1])), int(np.sqrt(ar_token.shape[1]))
+        ar_token = ar_token.reshape(ar_token.shape[0], H, W, C)
+        ar_token = rearrange(ar_token, "b (h p1) (w p2) c -> b (h w) (p1 p2) c", p1=4, p2=4)
+        ar_token = ar_token[:, 1:].reshape(1, -1, C)
+        ar_token = ar_token.repeat(B,1,1)
+        # apply Transformer blocks
+        count = 0
+        for blk in self.dec_block:
+            ar_token = blk(ar_token, latent_ar[:, :, :, count],self.mask)
+            count += 1
+        ar_token = self.ar_norm(ar_token)
+        ar_token = self.ar_pred(ar_token)
+        return ar_token
+
     def forward(self, x, mask_ratio=0.0, max_span_length=1, use_masking=False, masking_version=0):
-        # embed patches
+        # Patch embedding
         x = self.layer_norm(x)
         x = self.patch_embed(x)
         b, c, w, h = x.shape
         x = x.view(b, c, -1).permute(0, 2, 1)
 
+        # Masking + Encoding
         if masking_version == 1:
             x = x + self.pos_embed
             if use_masking:
@@ -529,16 +653,19 @@ class MaskedAutoencoderViT(nn.Module):
                 x, _, _ = self.random_masking(x, mask_ratio, max_span_length, masking_version)
             x = x + self.pos_embed
 
-            # apply Transformer blocks
             for blk in self.blocks:
                 x = blk(x)
             x = self.norm(x)
         # To CTC Loss
         # Apply head (BiLSTM or Linear)
         x = self.head(x)
+
         # Only apply layer norm if not using BiLSTM (BiLSTM already has proper output)
-        if  self.head_type == 'linear':
+        if self.head_type == 'linear':
             x = self.layer_norm(x)
+
+        #AR decoding
+
 
         return x
 

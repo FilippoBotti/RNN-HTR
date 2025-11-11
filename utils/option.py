@@ -41,7 +41,8 @@ def _apply_config_to_args(cfg: Dict[str, Any], args: argparse.Namespace, frozen_
         ('bilstm_num_layers', m.get('bilstm_num_layers'), 'bilstm_num_layers'),
         ('bilstm_dropout', m.get('bilstm_dropout'), 'bilstm_dropout'),
         ('use_bimamba_arch_proj', m.get('use_bimamba_arch_proj'), 'use_bimamba_arch_proj'),
-        ('use_bimamba_head_proj', m.get('use_bimamba_head_proj'), 'use_bimamba_head_proj')
+        ('use_bimamba_head_proj', m.get('use_bimamba_head_proj'), 'use_bimamba_head_proj'),
+        ('autoregressive_head', m.get('autoregressive_head', False), 'autoregressive_head'),
     ]:
         if v is not None and dest not in frozen_keys:
             setattr(args, dest, v)
@@ -89,6 +90,7 @@ def _apply_config_to_args(cfg: Dict[str, Any], args: argparse.Namespace, frozen_
         ('cos_temp', t.get('cos_temp'), 'cos_temp'),
         ('mask_version', t.get('mask_version'), 'mask_version'),
         ('use_masking', t.get('use_masking'), 'use_masking'),
+        ('use_autoregressive_decoder', t.get('use_autoregressive_decoder', False), 'use_autoregressive_decoder'),
     ]:
         if v is not None and dest not in frozen_keys:
             setattr(args, dest, v)

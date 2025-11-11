@@ -131,15 +131,21 @@ class BiLSTMHead(nn.Module):
         output = []
         if self.autoregressive_head:
             steps = x.shape[1] 
-            h = torch.zeros(self.num_layers, x.shape[0], self.hidden_dim).to(x.device)
+            #h = (h0, c0)
+            h = (torch.zeros(self.num_layers, x.shape[0], self.hidden_dim).to(x.device),
+                torch.zeros(self.num_layers, x.shape[0], self.hidden_dim).to(x.device))
 
             for t in range(steps):
                 # Sample features at timestep t
                 x_t = x[:, t, :]
+                #TODO: provare
+                # x_t = out
+
                 # LSTM step
-                out, h = self.bilstm(x_t, h)
+                out, h = self.bilstm(x_t.unsqueeze(1), h)
+
                 # Map hidden to prediction at step t+1
-                y = self.fc(out)
+                y = self.fc(out).squeeze(1)
                 output.append(y)
 
             output = torch.stack(output, dim=1)

@@ -1,39 +1,28 @@
 import torch
 import torch.nn as nn
-from mamba_ssm import Mamba2
 from timm.models.vision_transformer import Mlp, DropPath
 
-class BiMamba(nn.Module):
+class BiLSTM(nn.Module):
     """BiMamba head for sequence modeling"""
-    def __init__(self, input_dim, output_dim=768, d_state=16, use_bimamba_arch_proj=False):
+    def __init__(self, input_dim, hidden_dim, num_layers, dropout=0.1):
         super().__init__()
         # BiMamba layer
-        self.fwd_mamba = Mamba2(
-            input_dim,
-            d_state=d_state,
+        self.bilstm = nn.LSTM(
+            input_size=input_dim,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
+            bidirectional=True,
+            dropout=dropout if num_layers > 1 else 0
         )
-        self.bwd_mamba = Mamba2(
-            input_dim,
-            d_state=d_state,
-        )
-        self.use_bimamba_arch_proj = use_bimamba_arch_proj
-
-        if use_bimamba_arch_proj:
-            self.proj = nn.Linear(input_dim * 2, output_dim)
         
     def forward(self, x):
-        fwd = self.fwd_mamba(x)
-        x_flip = x.flip(dims=[1])
-        bimamba_out_flip = self.bwd_mamba(x_flip)
-        bwd = bimamba_out_flip.flip(dims=[1])
-
-        if self.use_bimamba_arch_proj:
-            output = self.proj(torch.cat([fwd, bwd], dim=-1))
-        else:
-            output = fwd + bwd
-        return output
+        lstm_out = self.bilstm(x)[0]  # Get the output from LSTM
+        # output shape: [batch_size, sequence_length, nb_cls]
+        
+        return lstm_out
     
-class BiMambaBlock(nn.Module):
+class BiLSTMBlock(nn.Module):
     """BiMamba block for sequence modeling"""
 
     def __init__(
@@ -51,7 +40,7 @@ class BiMambaBlock(nn.Module):
         super().__init__()
         self.norm1 = norm_layer(dim, elementwise_affine=True)
 
-        self.attn = BiMamba(dim, d_state=16, use_bimamba_arch_proj=use_bimamba_arch_proj)
+        self.attn = BiLSTM(dim, dim//2, num_layers=1, dropout=drop)
         self.ls1 = LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
         # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
         self.drop_path1 = DropPath(drop_path) if drop_path > 0. else nn.Identity()

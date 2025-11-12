@@ -15,42 +15,8 @@ from vmamba.double_direction_vssm import VSSBlockDouble, SS2D as SS2D_Double
 # from rwkv.rwkv_model import RWKV_Block
 from xlstm.vision_xlstm import SequenceTraversal, ViLBlock
 from vmamba.bidi_mamba import BiMambaBlock, BiMamba
+from vmamba.bilstm import BiLSTMBlock
 
-class BiMambaHead(nn.Module):
-    """BiMamba head for sequence modeling"""
-    
-    def __init__(self, input_dim, hidden_dim, num_layers, nb_cls, use_bimamba_projection, dropout=0.1):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        self.num_layers = num_layers
-        self.use_bimamba_projection = use_bimamba_projection
-        
-        # BiMamba layer
-        self.bimamba = Mamba2(
-            input_dim,
-            d_state=16,
-        )
-        
-        # Final projection layer
-        if self.use_bimamba_projection:
-            self.fc = nn.Linear(input_dim, nb_cls)
-        
-    def forward(self, x):
-        # x shape: [batch_size, sequence_length, input_dim]
-        bimamba_out = self.bimamba(x)
-        # bimamba_out shape: [batch_size, sequence_length, input_dim]
-        x_flip = x.flip(dims=[1])
-        bimamba_out_flip = self.bimamba(x_flip)
-        bimamba_out_flip = bimamba_out_flip.flip(dims=[1])
-        # Apply final linear layer
-        if self.use_bimamba_projection:
-            output = self.fc(bimamba_out + bimamba_out_flip)
-        else: 
-            output = bimamba_out + bimamba_out_flip
-        # output shape: [batch_size, sequence_length, nb_cls]
-        
-        return output
-    
 class BiLSTMHead(nn.Module):
     """BiLSTM head for sequence modeling"""
     
@@ -227,7 +193,6 @@ class MaskedAutoencoderViT(nn.Module):
                  mlp_ratio=4.,
                  norm_layer=nn.LayerNorm,
                  use_bimamba_arch_proj=False,
-                 use_bimamba_head_proj=False,
                  args=None,
                  **kwargs):
         super().__init__()
@@ -242,9 +207,6 @@ class MaskedAutoencoderViT(nn.Module):
         self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim),
                                       requires_grad=False)  # fixed sin-cos embedding
         # --------------------------------------------------------------------------
-
-        self.use_bimamba_projection = use_bimamba_head_proj
-        self.use_bimamba_arch_proj = use_bimamba_arch_proj
 
         if args.architecture == 'mamba':
             if args.mamba_scan_type == 'single':
@@ -319,6 +281,19 @@ class MaskedAutoencoderViT(nn.Module):
                     args=args
                 )
             for _ in range(depth)])
+        elif args.architecture == 'bilstm':
+            self.blocks = nn.ModuleList([
+                BiLSTMBlock(
+                    dim=embed_dim,
+                    mlp_ratio=mlp_ratio,
+                    drop=0.0,
+                    init_values=None,
+                    drop_path=args.drop_path,
+                    act_layer=nn.GELU,
+                    norm_layer=norm_layer,
+                    args=args
+                )
+            for _ in range(depth)])
         elif args.architecture == 'hybrid':
             layers = []
             for i in range(depth):
@@ -384,15 +359,6 @@ class MaskedAutoencoderViT(nn.Module):
                 num_layers=bilstm_num_layers,
                 nb_cls=nb_cls,
                 dropout=bilstm_dropout
-            )
-        elif self.head_type == 'bimamba':
-            self.head = BiMambaHead(
-                input_dim=embed_dim,
-                hidden_dim=embed_dim,
-                num_layers=2,
-                nb_cls=nb_cls,
-                use_bimamba_projection=use_bimamba_projection,
-                dropout=0.1
             )
         elif self.head_type == 'linear':
             self.head = torch.nn.Linear(embed_dim, nb_cls)

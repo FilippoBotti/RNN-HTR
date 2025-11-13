@@ -48,6 +48,38 @@ class BiLSTMHead(nn.Module):
         # output shape: [batch_size, sequence_length, nb_cls]
         
         return output
+    
+class GRUHead(nn.Module):
+    """GRU head for sequence modeling"""
+    
+    def __init__(self, input_dim, hidden_dim, num_layers, nb_cls, bidirectional, dropout=0.1):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        
+        # BiLSTM layer
+        self.gru = nn.GRU(
+            input_size=input_dim,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
+            bidirectional=bidirectional,
+            dropout=dropout if num_layers > 1 else 0
+        )
+        
+        # Final projection layer
+        self.fc = nn.Linear(hidden_dim * 2, nb_cls)  # *2 for bidirectional
+        
+    def forward(self, x):
+        # x shape: [batch_size, sequence_length, input_dim]
+        gru_out, _ = self.gru(x)
+        # lstm_out shape: [batch_size, sequence_length, hidden_dim * 2]
+        
+        # Apply final linear layer
+        output = self.fc(gru_out)
+        # output shape: [batch_size, sequence_length, nb_cls]
+        
+        return output
 
 
 class Attention(nn.Module):
@@ -358,7 +390,7 @@ class MaskedAutoencoderViT(nn.Module):
                 hidden_dim=bilstm_hidden_dim,
                 num_layers=bilstm_num_layers,
                 nb_cls=nb_cls,
-                dropout=bilstm_dropout
+                dropout=bilstm_dropout,
             )
         elif self.head_type == 'linear':
             self.head = torch.nn.Linear(embed_dim, nb_cls)
@@ -369,6 +401,19 @@ class MaskedAutoencoderViT(nn.Module):
                     output_dim=nb_cls
                 ),
                 # torch.nn.Linear(embed_dim, nb_cls)
+            )
+        elif self.head_type == 'gru':
+            bidirectional = getattr(args, 'bidirectional', False)
+            bilstm_hidden_dim = getattr(args, 'bilstm_hidden_dim', 256)
+            bilstm_num_layers = getattr(args, 'bilstm_num_layers', 2)
+            bilstm_dropout = getattr(args, 'bilstm_dropout', 0.1)
+            self.head = GRUHead(
+                input_dim=embed_dim,
+                hidden_dim=bilstm_hidden_dim,
+                num_layers=bilstm_num_layers,
+                nb_cls=nb_cls,
+                dropout=bilstm_dropout,
+                bidirectional=bidirectional,
             )
         else:
             raise ValueError(f"Unsupported head type: {self.head_type}")

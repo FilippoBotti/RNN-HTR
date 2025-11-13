@@ -31,7 +31,7 @@ model:
   # RNN head params
   bidirectional: false
   bilstm_hidden_dim: 512
-  bilstm_num_layers: 2
+  bilstm_num_layers: 4
   bilstm_dropout: 0.1
 
 optimizer:

@@ -68,7 +68,8 @@ class GRUHead(nn.Module):
         )
         
         # Final projection layer
-        self.fc = nn.Linear(hidden_dim * 2, nb_cls)  # *2 for bidirectional
+        hidden_dim = 2 * hidden_dim if bidirectional else hidden_dim
+        self.fc = nn.Linear(hidden_dim, nb_cls)  # *2 for bidirectional
         
     def forward(self, x):
         # x shape: [batch_size, sequence_length, input_dim]

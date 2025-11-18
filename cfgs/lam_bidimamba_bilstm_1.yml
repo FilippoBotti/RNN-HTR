@@ -1,11 +1,11 @@
 output:
-  out_dir: ./checkpoints/htr/lam
-  exp_name: lam_bidimamba_bilstm_1 #dataset_backbonetype_headtype_version
+  out_dir: /home/filippo/checkpoints/htr/best/lam
+  exp_name: bidimamba_bilstm
   use_wandb: false
 
 dataset:
   name: LAM
-  data_path: ./data/LAM/lines/
+  data_path: ./data/LAM/
   train_data_list: ./data/LAM/train.ln
   val_data_list: ./data/LAM/val.ln
   test_data_list: ./data/LAM/test.ln

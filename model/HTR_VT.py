@@ -241,61 +241,7 @@ class MaskedAutoencoderViT(nn.Module):
                                       requires_grad=False)  # fixed sin-cos embedding
         # --------------------------------------------------------------------------
 
-        if args.architecture == 'mamba':
-            if args.mamba_scan_type == 'single':
-                self.blocks = nn.ModuleList([
-                    VSSBlockSingle(
-                        hidden_dim=embed_dim, 
-                        norm_layer=norm_layer,
-                        mlp_ratio=mlp_ratio,
-                        use_checkpoint=True,
-                        ssm_init="v2",
-                        forward_type="v3",
-                        num_patches=self.num_patches,
-                        drop_path=args.drop_path,
-                        attn_drop_rate=args.attn_drop_rate,
-                    )
-                for _ in range(depth)])
-            elif args.mamba_scan_type == 'double':
-                self.blocks = nn.ModuleList([
-                    VSSBlockDouble(
-                        hidden_dim=embed_dim, 
-                        norm_layer=norm_layer,
-                        mlp_ratio=mlp_ratio,
-                        d_state=4,
-                        use_checkpoint=True,
-                        ssm_init="v2",
-                        forward_type="v3",
-                        num_patches=self.num_patches,
-                        drop_path=args.drop_path,
-                        attn_drop_rate=args.attn_drop_rate,
-                    )
-                for _ in range(depth)])
-            elif args.mamba_scan_type == 'quad':
-                self.blocks = nn.ModuleList([
-                    VSSBlock(
-                        hidden_dim=embed_dim, 
-                        norm_layer=norm_layer,
-                        mlp_ratio=mlp_ratio,
-                        use_checkpoint=True,
-                        ssm_init="v2",
-                        forward_type="v3",
-                        num_patches=self.num_patches,
-                        drop_path=args.drop_path,
-                        attn_drop_rate=args.attn_drop_rate,
-                    )
-                for _ in range(depth)])
-        elif args.architecture == 'rwkv':
-            self.blocks = nn.ModuleList([
-                RWKV_Block(n_embd=embed_dim, n_head=num_heads, n_layer=12, layer_id=i, patch_resolution=self.grid_size, shift_mode='q_shift_multihead', shift_pixel=1,
-                          drop_path=0.1, hidden_rate=4, init_mode='fancy', init_values=0.1,
-                          post_norm=False, key_norm=False, with_cls_token=False, with_cp=False)
-            for i in range(depth)])
-        elif args.architecture == 'xlstm':
-            self.blocks = nn.ModuleList([
-                ViLBlock(dim=embed_dim, direction=SequenceTraversal.ROWWISE_FROM_TOP_LEFT)
-            for i in range(depth)])
-        elif args.architecture == 'transformer':
+        if args.architecture == 'transformer':
             self.blocks = nn.ModuleList([
                 Block(embed_dim, num_heads, self.num_patches,
                       mlp_ratio, qkv_bias=True, norm_layer=norm_layer, args=args)
@@ -331,50 +277,28 @@ class MaskedAutoencoderViT(nn.Module):
             layers = []
             for i in range(depth):
                 if i % 2 == 0:
-                    if args.mamba_scan_type == 'single':        
-                        layers.append(VSSBlockSingle(
-                            hidden_dim=embed_dim, 
-                            norm_layer=norm_layer,
-                            mlp_ratio=mlp_ratio,
-                            use_checkpoint=True,
-                            ssm_init="v2",
-                            forward_type="v3",
-                            scan_mode="uni",
-                            num_patches=self.num_patches,
-                            drop_path=args.drop_path,
-                            attn_drop_rate=args.attn_drop_rate,
-                        ))
-                    elif args.mamba_scan_type == 'double':
-                        layers.append(VSSBlockDouble(
-                            hidden_dim=embed_dim, 
-                            norm_layer=norm_layer,
-                            mlp_ratio=mlp_ratio,
-                            use_checkpoint=True,
-                            ssm_init="v2",
-                            forward_type="v3",
-                            scan_mode="bi",
-                            num_patches=self.num_patches,
-                            drop_path=args.drop_path,
-                            attn_drop_rate=args.attn_drop_rate,
-                        ))
-                    elif args.mamba_scan_type == 'quad':
-                        layers.append(VSSBlock(
-                            hidden_dim=embed_dim, 
-                            norm_layer=norm_layer,
-                            mlp_ratio=mlp_ratio,
-                            use_checkpoint=True,
-                            ssm_init="v2",
-                            forward_type="v3",
-                            scan_mode="quad",
-                            num_patches=self.num_patches,
-                            drop_path=args.drop_path,
-                            attn_drop_rate=args.attn_drop_rate,
-                        ))
-                else:
-                    layers.append(Block(
-                        embed_dim, num_heads, self.num_patches,
-                        mlp_ratio, qkv_bias=True, norm_layer=norm_layer, args=args
+                    layers.append(BiMambaBlock(
+                        dim=embed_dim,
+                        mlp_ratio=mlp_ratio,
+                        drop=0.0,
+                        init_values=None,
+                        drop_path=args.drop_path,
+                        act_layer=nn.GELU,
+                        norm_layer=norm_layer,
+                        use_bimamba_arch_proj=use_bimamba_arch_proj,
+                        args=args
                     ))
+                else:
+                    layers.append(BiLSTMBlock(
+                    dim=embed_dim,
+                    mlp_ratio=mlp_ratio,
+                    drop=0.0,
+                    init_values=None,
+                    drop_path=args.drop_path,
+                    act_layer=nn.GELU,
+                    norm_layer=norm_layer,
+                    args=args
+                ))
             self.blocks = nn.ModuleList(layers)
         
         self.norm = norm_layer(embed_dim, elementwise_affine=True)

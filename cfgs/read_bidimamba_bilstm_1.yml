@@ -1,6 +1,6 @@
 output:
-  out_dir: ./checkpoints/htr/read
-  exp_name: read_bidimamba_bilstm_1 #dataset_backbonetype_headtype_version
+  out_dir: /home/filippo/checkpoints/htr/best/read
+  exp_name: bidimamba_bilstm
   use_wandb: false
 
 dataset:

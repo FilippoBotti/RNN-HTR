@@ -1,6 +1,6 @@
 output:
-  out_dir: /home/filippo/projects/htr_vmamba/checkpoints/htr/iam_bidimamba/bidimamba_bilstm_depth5/
-  exp_name: 2025-11-11_12-21-30 #dataset_backbonetype_headtype_version
+  out_dir: /home/filippo/checkpoints/htr/best/iam
+  exp_name: bidimamba_bilstm
   use_wandb: false
 
 dataset:
@@ -16,7 +16,7 @@ model:
   architecture: bidimamba
   # One of: linear, bilstm, bimamba, bidimamba
   head_type: bilstm
-  depth: 5
+  depth: 4
   # One of: single, double, quad
   mamba_scan_type: single
   # Optional boolean toggle used by some model compositions

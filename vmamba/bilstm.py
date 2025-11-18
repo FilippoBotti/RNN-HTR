@@ -40,7 +40,7 @@ class BiLSTMBlock(nn.Module):
         super().__init__()
         self.norm1 = norm_layer(dim, elementwise_affine=True)
 
-        self.attn = BiLSTM(dim, dim//2, num_layers=1, dropout=drop)
+        self.attn = BiLSTM(dim, dim//2, num_layers=2, dropout=drop)
         self.ls1 = LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
         # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
         self.drop_path1 = DropPath(drop_path) if drop_path > 0. else nn.Identity()

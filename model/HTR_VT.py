@@ -300,6 +300,44 @@ class MaskedAutoencoderViT(nn.Module):
                     args=args
                 ))
             self.blocks = nn.ModuleList(layers)
+        elif args.architecture == 'hybrid_mmmt':
+            layers = []
+            for _ in range(depth-1):
+                layers.append(BiMambaBlock(
+                    dim=embed_dim,
+                    mlp_ratio=mlp_ratio,
+                    drop=0.0,
+                    init_values=None,
+                    drop_path=args.drop_path,
+                    act_layer=nn.GELU,
+                    norm_layer=norm_layer,
+                    use_bimamba_arch_proj=use_bimamba_arch_proj,
+                    args=args
+                ))
+            layers.append(Block(embed_dim, num_heads, self.num_patches,
+                    mlp_ratio, qkv_bias=True, norm_layer=norm_layer, args=args)
+            )
+            self.blocks = nn.ModuleList(layers)
+        elif args.architecture == 'hybrid_mtmt':
+            layers = []
+            for i in range(depth):
+                if i % 2 == 0:
+                    layers.append(BiMambaBlock(
+                        dim=embed_dim,
+                        mlp_ratio=mlp_ratio,
+                        drop=0.0,
+                        init_values=None,
+                        drop_path=args.drop_path,
+                        act_layer=nn.GELU,
+                        norm_layer=norm_layer,
+                        use_bimamba_arch_proj=use_bimamba_arch_proj,
+                        args=args
+                    ))
+                else:
+                    layers.append(Block(embed_dim, num_heads, self.num_patches,
+                            mlp_ratio, qkv_bias=True, norm_layer=norm_layer, args=args)
+                    )
+            self.blocks = nn.ModuleList(layers)
         
         self.norm = norm_layer(embed_dim, elementwise_affine=True)
         

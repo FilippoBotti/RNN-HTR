@@ -38,7 +38,7 @@ def main():
     args = option.get_args_parser()
     torch.manual_seed(args.seed)
 
-    args.save_dir = os.path.join(args.out_dir, args.exp_name, time.strftime("%Y-%m-%d_%H-%M-%S"))
+    args.save_dir = os.path.join(args.out_dir, args.exp_name, time.strftime("%Y-%m-%d_%H-%M-%S_%f"))
     os.makedirs(args.save_dir, exist_ok=True)
 
     logger = utils.get_logger(args.save_dir)

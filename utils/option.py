@@ -29,6 +29,7 @@ def _apply_config_to_args(cfg: Dict[str, Any], args: argparse.Namespace, frozen_
         ('architecture', m.get('architecture'), 'architecture'),
         ('head_type', m.get('head_type'), 'head_type'),
         ('mamba_scan_type', m.get('mamba_scan_type'), 'mamba_scan_type'),
+        ('mamba_single_direction', m.get('mamba_single_direction'), 'mamba_single_direction'),
         ('use_mamba', m.get('use_mamba'), 'use_mamba'),
         ('nb_cls', m.get('nb_cls'), 'nb_cls'),
         ('img_size', m.get('img_size'), 'img_size'),

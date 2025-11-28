@@ -257,6 +257,7 @@ class MaskedAutoencoderViT(nn.Module):
                     act_layer=nn.GELU,
                     norm_layer=norm_layer,
                     use_bimamba_arch_proj=use_bimamba_arch_proj,
+                    single_direction=args.mamba_single_direction,
                     args=args
                 )
             for _ in range(depth)])

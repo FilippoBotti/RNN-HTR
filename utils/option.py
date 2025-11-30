@@ -194,6 +194,7 @@ def get_args_parser():
     parser.add_argument('--mask-version', default=0, type=int, help='mask version used for training (0 = legacy)')
     parser.add_argument('--use-masking', action='store_true', default=False, help='whether to use masking during training')
     parser.add_argument('--use-shuffle', action='store_true', default=False, help='whether to use masking during training')
+    parser.add_argument('--mamba_single_direction', action='store_true', default=False, help='whether to use masking during training')
     parser.add_argument('--out-dir', type=str, default='./output', help='output directory')
     parser.add_argument('--use-sam', action='store_true', default=False, help='whether to use SAM optimizer')
     parser.add_argument('--train-bs', default=8, type=int, help='train batch size')

@@ -20,6 +20,7 @@ from data.PONTALTO.pontalto import PONTALTO
 from data.format_iam import IAMDatasetFormatter, IAMDataset, build_charset
 
 import time
+import uuid
 
 def compute_loss(args, model, image, batch_size, criterion, text, length, use_masking=False):
     preds = model(image, args.mask_ratio, args.max_span_length, use_masking=use_masking)
@@ -38,7 +39,7 @@ def main():
     args = option.get_args_parser()
     torch.manual_seed(args.seed)
 
-    args.save_dir = os.path.join(args.out_dir, args.exp_name, time.strftime("%Y-%m-%d_%H-%M-%S"))
+    args.save_dir = os.path.join(args.out_dir, args.exp_name, time.strftime("%Y-%m-%d_%H-%M-%S") + "_" + uuid.uuid4().hex[:8])
     os.makedirs(args.save_dir, exist_ok=True)
 
     logger = utils.get_logger(args.save_dir)

@@ -21,8 +21,8 @@ from data.format_iam import IAMDatasetFormatter, IAMDataset, build_charset
 
 import time
 
-def compute_loss(args, model, image, batch_size, criterion, text, length):
-    preds = model(image, args.mask_ratio, args.max_span_length, use_masking=True)
+def compute_loss(args, model, image, batch_size, criterion, text, length, use_masking=False):
+    preds = model(image, args.mask_ratio, args.max_span_length, use_masking=use_masking)
     preds = preds.float()
     preds_size = torch.IntTensor([preds.size(1)] * batch_size).cuda()
     preds = preds.permute(1, 0, 2).log_softmax(2)
@@ -202,10 +202,10 @@ def main():
             image = batch[0].cuda()
             text, length = converter.encode(batch[1])
             batch_size = image.size(0)
-            loss = compute_loss(args, model, image, batch_size, criterion, text, length)
+            loss = compute_loss(args, model, image, batch_size, criterion, text, length, use_masking=args.use_masking)
             loss.backward()
             optimizer.first_step(zero_grad=True)
-            compute_loss(args, model, image, batch_size, criterion, text, length).backward()
+            compute_loss(args, model, image, batch_size, criterion, text, length, use_masking=args.use_masking).backward()
             optimizer.second_step(zero_grad=True)
             model.zero_grad()
             model_ema.update(model, num_updates=nb_iter / 2)

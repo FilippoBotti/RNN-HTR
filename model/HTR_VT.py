@@ -232,6 +232,7 @@ class MaskedAutoencoderViT(nn.Module):
         # --------------------------------------------------------------------------
         # MAE encoder specifics
         self.layer_norm = LayerNorm()
+        self.args = args
         self.patch_embed = resnet18.ResNet18(embed_dim)
         self.grid_size = [img_size[0] // patch_size[0], img_size[1] // patch_size[1]]
         self.embed_dim = embed_dim
@@ -437,18 +438,20 @@ class MaskedAutoencoderViT(nn.Module):
 
         return x_masked, idx_restore, mask
 
+    
     def forward(self, x, mask_ratio=0.0, max_span_length=1, use_masking=False, masking_version=0):
         # embed patches
         x = self.layer_norm(x)
         x = self.patch_embed(x)
         b, c, w, h = x.shape
         x = x.view(b, c, -1).permute(0, 2, 1)
-
+        L = h*w
+        
         if masking_version == 1:
             x = x + self.pos_embed
             if use_masking:
                 x, idx_restore, mask = self.random_masking(x, mask_ratio, max_span_length, masking_version)
-
+                
                 for blk in self.blocks:
                     x = blk(x)
                 x_encoded = self.norm(x)
@@ -466,8 +469,25 @@ class MaskedAutoencoderViT(nn.Module):
             x = x + self.pos_embed
 
             # apply Transformer blocks
-            for blk in self.blocks:
-                x = blk(x)
+            for i, blk in enumerate(self.blocks):
+                if self.args.use_shuffle:
+                    if self.training and torch.rand(1).item() < (0.1 * i):
+                        # Generate a random permutation of indices
+                        shuffled_indices = torch.randperm(L, device=x.device).repeat(b, 1)
+                        # Get inverse indices by sorting the shuffled indices
+                        inverse_indices = torch.argsort(shuffled_indices, dim=1)
+                        # Apply the permutation to shuffle the sequence
+                        x_permuted = x.gather(1, shuffled_indices.unsqueeze(-1).expand(-1, -1, x.size(2)))
+                        # Forward pass through the layer
+                        output_permuted = blk(x_permuted)
+                        # Restore the original order
+                        x = output_permuted.gather(1, inverse_indices.unsqueeze(-1).expand(-1, -1, output_permuted.size(2)))
+                    else:
+                        x = blk(x)
+                else:
+                    x = blk(x)
+                
+                
             x = self.norm(x)
         # To CTC Loss
         # Apply head (BiLSTM or Linear)

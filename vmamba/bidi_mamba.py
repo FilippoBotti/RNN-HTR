@@ -66,6 +66,8 @@ class BiMambaBlock(nn.Module):
         x = x + self.drop_path2(self.ls2(self.mlp(self.norm2(x))))
         return x
     
+    
+        
 class LayerScale(nn.Module):
     def __init__(self, dim, init_values=1e-5, inplace=False):
         super().__init__()

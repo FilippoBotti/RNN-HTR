@@ -4,14 +4,12 @@
 ### Introduction
 This is the official implementation of **HTR-MB**, a state-of-the-art Mamba-based architecture for Handwritten Text Recognition (HTR). Unlike Transformer-based approaches that suffer from quadratic complexity, non-monotonic attention, and poor memory efficiency during inference, our method leverages Mamba's linear complexity and monotonic nature combined with a BiLSTM head to effectively model short-range dependencies in handwritten text.
 
-### HTR-MB Solution
-
 ## Architecture
 <p align="center">
 <img src="img/arch.png" width="500px" alt="teaser">
 </p>
 
-## 4. Visual Results
+## Visual Results
 <p align="center">
 <img src="img/results.png" width="900px" alt="method">
 </p>

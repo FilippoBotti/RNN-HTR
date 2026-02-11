@@ -4,10 +4,9 @@ import torch.nn.functional as F
 from timm.models.vision_transformer import Mlp, DropPath
 
 import numpy as np
-from model import resnet18, bidi_mamba
+from model import resnet18, bidi_mamba, bilstm
 from functools import partial
 
-from vmamba.bilstm import BiLSTMBlock
 
 class BiLSTMHead(nn.Module):
     """BiLSTM head for sequence modeling"""
@@ -220,7 +219,7 @@ class MaskedAutoencoderViT(nn.Module):
             for _ in range(depth)])
         elif args.architecture == 'bilstm':
             self.blocks = nn.ModuleList([
-                BiLSTMBlock(
+                bilstm.BiLSTMBlock(
                     dim=embed_dim,
                     mlp_ratio=mlp_ratio,
                     drop=0.0,

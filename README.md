@@ -1,52 +1,32 @@
-# 📙 HTR-VT (Pattern Recognition)
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/htr-vt-handwritten-text-recognition-with/handwritten-text-recognition-on-lam-line)](https://paperswithcode.com/sota/handwritten-text-recognition-on-lam-line?p=htr-vt-handwritten-text-recognition-with)
+# 📙 HTR-MB: Combining Mamba and BiLSTM for Handwritten Text Recognition
 
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/htr-vt-handwritten-text-recognition-with/handwritten-text-recognition-on-read2016-line)](https://paperswithcode.com/sota/handwritten-text-recognition-on-read2016-line?p=htr-vt-handwritten-text-recognition-with)
 
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/htr-vt-handwritten-text-recognition-with/handwritten-text-recognition-on-iam-line)](https://paperswithcode.com/sota/handwritten-text-recognition-on-iam-line?p=htr-vt-handwritten-text-recognition-with)
 ### Introduction
-This is the official implementation of our **Pattern Recognition(PR)** 2024 paper *"HTR-VT: Handwritten Text Recognition with Vision Transformer".* It's a new and effective baseline for handwritten text recognition solely using Vision Transformer and CTC Loss. 
+This is the official implementation of **HTR-MB**, a state-of-the-art Mamba-based architecture for Handwritten Text Recognition (HTR). Unlike Transformer-based approaches that suffer from quadratic complexity, non-monotonic attention, and poor memory efficiency during inference, our method leverages Mamba's linear complexity and monotonic nature combined with a BiLSTM head to effectively model short-range dependencies in handwritten text.
 
-[[Project Page]](https://yutingli0606.github.io/HTR-VT/)
-[[Paper]](https://www.sciencedirect.com/science/article/abs/pii/S0031320324007180)
-[[arXiv]](https://arxiv.org/pdf/2409.08573) 
-[[Google Drive]](https://drive.google.com/drive/folders/1g8ber-YqOeytDA4SqNah1otTt3AKCYXb?usp=drive_link)
+### HTR-MB Solution
 
-
-## Table of Content
-* [1. Overview](#1-overview)
-* [2. Visual Results](#2-visual-results)
-* [3. Installation](#3-installation)
-* [4. Quick Start](#4-quick-start)
-* [5. Citation](#5-citation)
-* [6. Acknowledgement](#6-acknowledgement)
-
-## 1. Overview
+## Architecture
 <p align="center">
-<img src="img/HTR-VT.png" width="500px" alt="teaser">
+<img src="img/arch.png" width="500px" alt="teaser">
 </p>
 
-## 2. Visual Results
+## 4. Visual Results
 <p align="center">
-<img src="img/visual.png" width="900px" alt="method">
+<img src="img/results.png" width="900px" alt="method">
 </p>
 
-## 3. Installation
+## Installation
 
-### 3.1. Environment
-
-Our model can be learnt in a **single GPU RTX-4090 24G**
 ```bash
-conda env create -f environment.yml
+conda create -n htr python=3.11
 conda activate htr
+pip install -r requirements.txt
 ```
 
-The code was tested on Python 3.9 and PyTorch 1.13.0.
+### Datasets
 
-
-### 3.2. Datasets
-
-* Using **IAM, READ2016 and LAM** for handwritten text recognition.
+* We evaluate on **IAM, READ2016 and LAM** datasets, achieving state-of-the-art results on all benchmarks.
 
 </summary>
   <details>
@@ -90,67 +70,30 @@ The structure of the file should be:
 ```
 
 
-## 4. Quick Start
-* We provide convenient and comprehensive commands in ./run/ to train and test on different datasets to help researchers reproducing the results of the paper.
-
-## Config-driven runs
-
-You can now launch experiments using modular YAML configs stored under `./cfgs`, named as `{dataset}{architecture}{version}.yml`.
-
-- Sections are organized for clarity and easy extension:
-  - `dataset`: name, paths, splits, nb_cls
-  - `model`: architecture, head_type, mamba_scan_type, img_size, patch_size, proj, regularization
-  - `optimizer`: initial/max/min lr, weight_decay, use_sam
-  - `training`: iters, logging cadence, seeding, EMA, masking/loss knobs
-  - `dataloader`: batch sizes and workers
-  - `augmentation`: probabilities and parameters
-  - `output`: out_dir, exp_name, use_wandb
-  - `pretrained`: path
-
-Base template with all options: `cfgs/_base_all_options.yml`.
-
-You can include it and override selectively using the `includes` key:
-
-```yaml
-# cfgs/my_experiment.yml
-includes:
-  - _base_all_options.yml
-
-dataset:
-  name: READ
-  data_path: ./data/read2016/lines/
-
-model:
-  architecture: bidimamba
-  head_type: bilstm
-  mamba_scan_type: single
-
-output:
-  out_dir: ./checkpoints/htr/read
-  exp_name: my_read_bidimamba_bilstm
-```
-
-Run training with a config (dataset subcommand is inferred from `dataset.name`):
-
+### Training
+Run the following script
 ```bash
-python3 train.py --config cfgs/READ_bidimamba_bidimamba_no_sam.yml
+sh run/train.sh
 ```
 
-The dataset subcommand is inferred from `dataset.name` in the YAML, and all hyperparameters are loaded in `train.py` via `utils/option.py`.
+### Results
 
-## 5. Citation
-If our project is helpful for your research, please consider citing :
-```
-@article{li2024htr,
-  title={HTR-VT: Handwritten text recognition with vision transformer},
-  author={Li, Yuting and Chen, Dexiong and Tang, Tinglong and Shen, Xi},
-  journal={Pattern Recognition},
-  pages={110967},
-  year={2024},
-  publisher={Elsevier}
-}
-```
+HTR-MB achieves **state-of-the-art performance** across all evaluated datasets:
 
-## 6. Acknowledgement
+| Dataset | CER ↓ | WER ↓ |
+|---------|-------|-------|
+| IAM |4.42 | 14.01 |
+| READ2016 | 3.49 | 15.07 |
+| LAM | 2.69 | 7.15 |
 
-We appreciate helps from public code: [VAN](https://github.com/FactoDeepLearning/VerticalAttentionOCR) and [OrigamiNet](https://github.com/IntuitionMachines/OrigamiNet).  
+*Detailed results and ablation studies available in the paper.*
+
+<!-- ## 7. Citation -->
+
+<!-- Currently under submission. -->
+
+
+
+## 8. Acknowledgement
+
+We appreciate helps from public code: [VAN](https://github.com/FactoDeepLearning/VerticalAttentionOCR), [OrigamiNet](https://github.com/IntuitionMachines/OrigamiNet), and [HTR-VT](https://github.com/Intellindust-AI-Lab/HTR-VT).  

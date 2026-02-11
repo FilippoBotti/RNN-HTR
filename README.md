@@ -1,5 +1,5 @@
 # HTR-MB: Combining Mamba and BiLSTM for Handwritten Text Recognition
-
+*Filippo Botti, Vittorio Bernuzzi, Tomaso Fontanini, Massimo Bertozzi and Andrea Prati*
 
 ### Introduction
 This is the official implementation of **HTR-MB**, a state-of-the-art Mamba-based architecture for Handwritten Text Recognition (HTR). Unlike Transformer-based approaches that suffer from quadratic complexity, non-monotonic attention, and poor memory efficiency during inference, our method leverages Mamba's linear complexity and monotonic nature combined with a BiLSTM head to effectively model short-range dependencies in handwritten text.
@@ -21,6 +21,9 @@ conda create -n htr python=3.11
 conda activate htr
 pip install -r requirements.txt
 ```
+
+## Checkpoints
+Download checkpoints from this [Directory](https://univpr-my.sharepoint.com/:f:/g/personal/filippo_botti_unipr_it/IgAhBzs3RtayTIDAMb9BgsZdAcW-UHsTsbgmDFgSUdPVIoo?e=9siZr6)
 
 ### Datasets
 

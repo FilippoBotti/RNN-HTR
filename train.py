@@ -1,6 +1,5 @@
 import torch
 import torch.utils.data
-import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
 
 import os
@@ -16,8 +15,6 @@ from tqdm import tqdm
 from data.LAM.utils import dummy_main
 from torchvision.transforms import ToTensor
 from data.RIMES import build_RIMES
-from data.PONTALTO.pontalto import PONTALTO
-from data.format_iam import IAMDatasetFormatter, IAMDataset, build_charset
 
 import time
 import uuid
@@ -55,7 +52,7 @@ def main():
     model_ema = utils.ModelEma(model, args.ema_decay)
     model.zero_grad()
     logger.info(model)
-    if args.subcommand in ['READ', 'IAM_OLD']:
+    if args.subcommand in ['READ', 'IAM']:
         logger.info('Loading train loader...')
         train_dataset = dataset.myLoadDS(args.train_data_list, args.data_path, args.img_size)
         train_loader = torch.utils.data.DataLoader(train_dataset,
@@ -107,61 +104,6 @@ def main():
             optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
         criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True)
         converter = utils.CTCLabelConverter(train_dataset.charset)
-    elif args.subcommand == 'IAM':
-        logger.info('Loading train loader...')
-        xml_folder = "./data/iam_dataset/xml"
-        image_folder = "./data/iam_dataset/lines"
-        train_file = "./data/iam_dataset/trainset.txt"
-        val_file = "./data/iam_dataset/validationset1.txt"
-        test_file = "./data/iam_dataset/testset.txt"
-        formatter = IAMDatasetFormatter(xml_folder, image_folder)
-        train_dataset = IAMDataset(train_file, formatter, img_size=args.img_size)
-        train_loader = torch.utils.data.DataLoader(train_dataset,
-                                                batch_size=args.train_bs,
-                                                shuffle=True,
-                                                pin_memory=True,
-                                                num_workers=args.num_workers,
-                                                collate_fn=partial(dataset.SameTrCollate, args=args))
-        train_iter = dataset.cycle_data(train_loader)
-
-        logger.info('Loading val loader...')
-        val_dataset = IAMDataset(val_file, formatter, img_size=args.img_size)
-        val_loader = torch.utils.data.DataLoader(val_dataset,
-                                                batch_size=args.val_bs,
-                                                shuffle=False,
-                                                pin_memory=True,
-                                                num_workers=args.num_workers)
-        test_dataset = IAMDataset(test_file, formatter, img_size=args.img_size)
-        test_loader = torch.utils.data.DataLoader(test_dataset,
-                                                batch_size=args.val_bs,
-                                                shuffle=False,
-                                                pin_memory=True,
-                                                num_workers=args.num_workers)
-        if args.use_sam:
-            optimizer = sam.SAM(model.parameters(), torch.optim.AdamW, lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
-        else:
-            optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
-        criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True)
-        converter = utils.CTCLabelConverter(build_charset(formatter))
-        
-    elif args.subcommand == 'PONTALTO':
-        logger.info('Loading train loader...')
-        train_dataset = PONTALTO(args.data_path , 'basic', ToTensor(), img_size=args.img_size, nameset='train')
-        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.train_bs, shuffle=True, pin_memory=True,
-                                               num_workers=args.num_workers, collate_fn=train_dataset.collate_fn)
-        train_iter = dataset.cycle_data(train_loader)
-        
-        logger.info('Loading val loader...')
-        val_dataset = PONTALTO(args.data_path, 'basic', ToTensor(), nameset='test', img_size=args.img_size, charset=train_dataset.charset)
-        val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.val_bs, shuffle=False, pin_memory=True,
-                                               num_workers=args.num_workers)
-        
-        if args.use_sam:
-            optimizer = sam.SAM(model.parameters(), torch.optim.AdamW, lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
-        else:
-            optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
-        criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True)
-        converter = utils.CTCLabelConverter(train_dataset.charset)
     elif args.subcommand == 'RIMES':
         train_dataset = build_RIMES(image_set='train', dataset_path=args.data_path, args=args)
         val_dataset = build_RIMES(image_set='val', dataset_path=args.data_path, args=args) 
@@ -181,7 +123,7 @@ def main():
         criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True)
         converter = utils.CTCLabelConverter(train_dataset.charset)
     else:
-        assert("Dataset must be READ/IAM/LAM/RIMES/PONTALTO")
+        assert("Dataset must be READ/IAM/LAM/RIMES")
         
     #Load pretrained model
     if args.pretrained_path:

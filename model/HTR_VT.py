@@ -4,17 +4,9 @@ import torch.nn.functional as F
 from timm.models.vision_transformer import Mlp, DropPath
 
 import numpy as np
-from model import resnet18
+from model import resnet18, bidi_mamba
 from functools import partial
-import math
 
-from vmamba import VSSBlock
-from mamba_ssm import Mamba2
-from vmamba.single_direction_vssm import VSSBlockSingle
-from vmamba.double_direction_vssm import VSSBlockDouble, SS2D as SS2D_Double
-# from rwkv.rwkv_model import RWKV_Block
-from xlstm.vision_xlstm import SequenceTraversal, ViLBlock
-from vmamba.bidi_mamba import BiMambaBlock, BiMamba
 from vmamba.bilstm import BiLSTMBlock
 
 class BiLSTMHead(nn.Module):
@@ -41,44 +33,8 @@ class BiLSTMHead(nn.Module):
     def forward(self, x):
         # x shape: [batch_size, sequence_length, input_dim]
         lstm_out, _ = self.bilstm(x)
-        # lstm_out shape: [batch_size, sequence_length, hidden_dim * 2]
-        
-        # Apply final linear layer
+        # output shape: [batch_size, sequence_length, nb_cls]
         output = self.fc(lstm_out)
-        # output shape: [batch_size, sequence_length, nb_cls]
-        
-        return output
-    
-class GRUHead(nn.Module):
-    """GRU head for sequence modeling"""
-    
-    def __init__(self, input_dim, hidden_dim, num_layers, nb_cls, bidirectional, dropout=0.1):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        self.num_layers = num_layers
-        
-        # BiLSTM layer
-        self.gru = nn.GRU(
-            input_size=input_dim,
-            hidden_size=hidden_dim,
-            num_layers=num_layers,
-            batch_first=True,
-            bidirectional=bidirectional,
-            dropout=dropout if num_layers > 1 else 0
-        )
-        
-        # Final projection layer
-        hidden_dim = 2 * hidden_dim if bidirectional else hidden_dim
-        self.fc = nn.Linear(hidden_dim, nb_cls)  # *2 for bidirectional
-        
-    def forward(self, x):
-        # x shape: [batch_size, sequence_length, input_dim]
-        gru_out, _ = self.gru(x)
-        # lstm_out shape: [batch_size, sequence_length, hidden_dim * 2]
-        
-        # Apply final linear layer
-        output = self.fc(gru_out)
-        # output shape: [batch_size, sequence_length, nb_cls]
         
         return output
 
@@ -249,7 +205,7 @@ class MaskedAutoencoderViT(nn.Module):
                 for i in range(depth)])
         elif args.architecture == 'bidimamba':
             self.blocks = nn.ModuleList([
-                BiMambaBlock(
+                bidi_mamba.BiMambaBlock(
                     dim=embed_dim,
                     mlp_ratio=mlp_ratio,
                     drop=0.0,
@@ -275,71 +231,8 @@ class MaskedAutoencoderViT(nn.Module):
                     args=args
                 )
             for _ in range(depth)])
-        elif args.architecture == 'hybrid':
-            layers = []
-            for i in range(depth):
-                if i % 2 == 0:
-                    layers.append(BiMambaBlock(
-                        dim=embed_dim,
-                        mlp_ratio=mlp_ratio,
-                        drop=0.0,
-                        init_values=None,
-                        drop_path=args.drop_path,
-                        act_layer=nn.GELU,
-                        norm_layer=norm_layer,
-                        use_bimamba_arch_proj=use_bimamba_arch_proj,
-                        args=args
-                    ))
-                else:
-                    layers.append(BiLSTMBlock(
-                    dim=embed_dim,
-                    mlp_ratio=mlp_ratio,
-                    drop=0.0,
-                    init_values=None,
-                    drop_path=args.drop_path,
-                    act_layer=nn.GELU,
-                    norm_layer=norm_layer,
-                    args=args
-                ))
-            self.blocks = nn.ModuleList(layers)
-        elif args.architecture == 'hybrid_mmmt':
-            layers = []
-            for _ in range(depth-1):
-                layers.append(BiMambaBlock(
-                    dim=embed_dim,
-                    mlp_ratio=mlp_ratio,
-                    drop=0.0,
-                    init_values=None,
-                    drop_path=args.drop_path,
-                    act_layer=nn.GELU,
-                    norm_layer=norm_layer,
-                    use_bimamba_arch_proj=use_bimamba_arch_proj,
-                    args=args
-                ))
-            layers.append(Block(embed_dim, num_heads, self.num_patches,
-                    mlp_ratio, qkv_bias=True, norm_layer=norm_layer, args=args)
-            )
-            self.blocks = nn.ModuleList(layers)
-        elif args.architecture == 'hybrid_mtmt':
-            layers = []
-            for i in range(depth):
-                if i % 2 == 0:
-                    layers.append(BiMambaBlock(
-                        dim=embed_dim,
-                        mlp_ratio=mlp_ratio,
-                        drop=0.0,
-                        init_values=None,
-                        drop_path=args.drop_path,
-                        act_layer=nn.GELU,
-                        norm_layer=norm_layer,
-                        use_bimamba_arch_proj=use_bimamba_arch_proj,
-                        args=args
-                    ))
-                else:
-                    layers.append(Block(embed_dim, num_heads, self.num_patches,
-                            mlp_ratio, qkv_bias=True, norm_layer=norm_layer, args=args)
-                    )
-            self.blocks = nn.ModuleList(layers)
+        else:
+            raise ValueError(f"Unsupported architecture: {args.architecture}")
         
         self.norm = norm_layer(embed_dim, elementwise_affine=True)
         
@@ -361,24 +254,11 @@ class MaskedAutoencoderViT(nn.Module):
             self.head = torch.nn.Linear(embed_dim, nb_cls)
         elif self.head_type == 'bidimamba':
             self.head = nn.Sequential(
-                 BiMamba(
+                 bidi_mamba.BiMamba(
                     embed_dim,
                     output_dim=nb_cls
                 ),
-                # torch.nn.Linear(embed_dim, nb_cls)
-            )
-        elif self.head_type == 'gru':
-            bidirectional = getattr(args, 'bidirectional', False)
-            bilstm_hidden_dim = getattr(args, 'bilstm_hidden_dim', 256)
-            bilstm_num_layers = getattr(args, 'bilstm_num_layers', 2)
-            bilstm_dropout = getattr(args, 'bilstm_dropout', 0.1)
-            self.head = GRUHead(
-                input_dim=embed_dim,
-                hidden_dim=bilstm_hidden_dim,
-                num_layers=bilstm_num_layers,
-                nb_cls=nb_cls,
-                dropout=bilstm_dropout,
-                bidirectional=bidirectional,
+                torch.nn.Linear(embed_dim, nb_cls)
             )
         else:
             raise ValueError(f"Unsupported head type: {self.head_type}")
@@ -439,45 +319,13 @@ class MaskedAutoencoderViT(nn.Module):
         Per-sample shuffling is done by argsort random noise.
         x: [N, L, D], sequence
         """
-        if masking_version == 0 or masking_version == 3:
-            mask = self.generate_span_mask(x, mask_ratio, max_span_length, masking_version)
-            x_masked = x * mask + (1 - mask) * self.mask_token
+        mask = self.generate_span_mask(x, mask_ratio, max_span_length, masking_version)
+        x_masked = x * mask + (1 - mask) * self.mask_token
 
-            idx_restore = None
-        elif masking_version == 1:
-            B = x.shape[0]
-            L = x.shape[1]  # Length of sequence including class token
-
-            noise = torch.rand(B, L, device=x.device)  # noise in [0, 1]
-
-            # Sort noise to get indices for masking
-            idx_shuffle = torch.argsort(noise, dim=1)  # ascending order
-            idx_restore = torch.argsort(idx_shuffle, dim=1)  # restore original order
-
-            # Calculate number of tokens to keep
-            len_keep = int(L * (1 - mask_ratio))
-
-            # Keep the first len_keep tokens
-            idx_keep = idx_shuffle[:, :len_keep]
-            x_masked = torch.gather(x, dim=1, index=idx_keep.unsqueeze(-1).repeat(1, 1, self.embed_dim))
-
-            # Create the binary mask (1 is keep, 0 is remove)
-            mask = torch.zeros(B, L, device=x.device)
-            mask.scatter_(1, idx_keep, 1.0)
-        elif masking_version == 2:
-            mask = self.generate_span_mask(x, mask_ratio, max_span_length, masking_version) #1 = visible, 0 = masked
-            mask_tokens = self.mask_token.repeat(
-                x.shape[0],
-                x.shape[1],
-                1
-            )
-            x_masked = x * mask + (1 - mask) * mask_tokens
-
-            idx_restore = None
-
+        idx_restore = None
         return x_masked, idx_restore, mask
 
-    
+
     def forward(self, x, mask_ratio=0.0, max_span_length=1, use_masking=False, masking_version=0):
         # embed patches
         x = self.layer_norm(x)
@@ -485,56 +333,33 @@ class MaskedAutoencoderViT(nn.Module):
         b, c, w, h = x.shape
         x = x.view(b, c, -1).permute(0, 2, 1)
         L = h*w
-        
-        if masking_version == 1:
-            x = x + self.pos_embed
-            if use_masking:
-                x, idx_restore, mask = self.random_masking(x, mask_ratio, max_span_length, masking_version)
-                
-                for blk in self.blocks:
-                    x = blk(x)
-                x_encoded = self.norm(x)
+       
+        if use_masking:
+            x, _, _ = self.random_masking(x, mask_ratio, max_span_length, masking_version)
+        x = x + self.pos_embed
 
-                mask_tokens = self.mask_token.repeat(
-                    x_encoded.shape[0],
-                    idx_restore.shape[1] - x_encoded.shape[1],
-                    1
-                )
-                x_ = torch.cat([x_encoded, mask_tokens], dim=1) # (B, L + L_mask, D)
-                x = torch.gather(x_, dim=1, index=idx_restore.unsqueeze(-1).repeat(1, 1, x_encoded.shape[2]))  # unshuffle
-        else:
-            if use_masking:
-                x, _, _ = self.random_masking(x, mask_ratio, max_span_length, masking_version)
-            x = x + self.pos_embed
-
-            # apply Transformer blocks
-            for i, blk in enumerate(self.blocks):
-                if self.args.use_shuffle:
-                    if self.training and torch.rand(1).item() < (0.1 * i):
-                        # Generate a random permutation of indices
-                        shuffled_indices = torch.randperm(L, device=x.device).repeat(b, 1)
-                        # Get inverse indices by sorting the shuffled indices
-                        inverse_indices = torch.argsort(shuffled_indices, dim=1)
-                        # Apply the permutation to shuffle the sequence
-                        x_permuted = x.gather(1, shuffled_indices.unsqueeze(-1).expand(-1, -1, x.size(2)))
-                        # Forward pass through the layer
-                        output_permuted = blk(x_permuted)
-                        # Restore the original order
-                        x = output_permuted.gather(1, inverse_indices.unsqueeze(-1).expand(-1, -1, output_permuted.size(2)))
-                    else:
-                        x = blk(x)
+        # apply Transformer blocks
+        for i, blk in enumerate(self.blocks):
+            if self.args.use_shuffle:
+                if self.training and torch.rand(1).item() < (0.1 * i):
+                    shuffled_indices = torch.randperm(L, device=x.device).repeat(b, 1)
+                    inverse_indices = torch.argsort(shuffled_indices, dim=1)
+                    x_permuted = x.gather(1, shuffled_indices.unsqueeze(-1).expand(-1, -1, x.size(2)))
+                    output_permuted = blk(x_permuted)
+                    x = output_permuted.gather(1, inverse_indices.unsqueeze(-1).expand(-1, -1, output_permuted.size(2)))
                 else:
                     x = blk(x)
-                
-                
-            x = self.norm(x)
+            else:
+                x = blk(x)
+            
+            
+        x = self.norm(x)
         # To CTC Loss
         # Apply head (BiLSTM or Linear)
         x = self.head(x)
         # Only apply layer norm if not using BiLSTM (BiLSTM already has proper output)
         if  self.head_type == 'linear':
             x = self.layer_norm(x)
-
         return x
 
 
@@ -550,4 +375,6 @@ def create_model(nb_cls, img_size, args,**kwargs):
                                  args=args,
                                  **kwargs)
     return model
+
+
 

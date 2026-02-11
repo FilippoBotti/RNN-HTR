@@ -43,7 +43,7 @@ def main():
     model.load_state_dict(model_dict, strict=True)
     model = model.cuda()
 
-    if args.subcommand in ['READ', 'IAM_OLD']:
+    if args.subcommand in ['READ', 'IAM']:
         logger.info('Loading test loader...')
         train_dataset = dataset.myLoadDS(args.train_data_list, args.data_path, args.img_size)
 
@@ -74,17 +74,9 @@ def main():
         criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True)
         converter = utils.CTCLabelConverter(train_dataset.charset)
 
-    elif args.subcommand == 'PONTALTO':
-        logger.info('Loading test loader...')
-        train_dataset = PONTALTO(args.data_path , 'basic', ToTensor(), img_size=args.img_size, nameset='train')
-        test_dataset = PONTALTO(args.data_path, 'basic', ToTensor(), nameset='test', img_size=args.img_size, charset=train_dataset.charset)
-        test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.val_bs, shuffle=False, pin_memory=True,
-                                               num_workers=args.num_workers)
-        criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True)
-        converter = utils.CTCLabelConverter(train_dataset.charset)
           
     else:
-        assert("Dataset must be READ/IAM/LAM/RIMES/PONTALTO")
+        assert("Dataset must be READ/IAM/LAM/RIMES")
 
     model.eval()
     with torch.no_grad():

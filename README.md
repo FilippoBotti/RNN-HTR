@@ -8,7 +8,7 @@ This is the official implementation of **HTR-MB**, a state-of-the-art Mamba-base
 
 ## Architecture
 <p align="center">
-<img src="img/arch.pdf" width="500px" alt="teaser">
+<img src="img/arch.png" width="500px" alt="teaser">
 </p>
 
 ## 4. Visual Results

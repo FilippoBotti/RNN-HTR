@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 
 
-def get_args_parser():
+def get_parser():
     parser = argparse.ArgumentParser(description='Origami for HTR',
                                      add_help=True,
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -130,6 +130,22 @@ def get_args_parser():
                       help='test data list')
     READ.add_argument('--nb-cls', default=90, type=int, help='nb of classes, IAM=79+1, READ2016=89+1')
 
+    CASIA = subparsers.add_parser("CASIA",
+                                 description='Dataset parser for training on CASIA',
+                                 add_help=True,
+                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                 help="Dataset parser for training on CASIA")
+
+    CASIA.add_argument('--train-data-list', type=str, default='./data/CASIA-HWDB2-line/train.ln',
+                      help='train data list (gc file)(ln file)')
+    CASIA.add_argument('--data-path', type=str, default='./data/CASIA-HWDB2-line/lines/',
+                      help='train data list')
+    CASIA.add_argument('--val-data-list', type=str, default='./data/CASIA-HWDB2-line/val.ln',
+                      help='val data list')
+    CASIA.add_argument('--test-data-list', type=str, default='./data/CASIA-HWDB2-line/test.ln',
+                      help='test data list')
+    CASIA.add_argument('--nb-cls', default=2705, type=int, help='nb of classes, IAM=79+1, READ2016=89+1')
+
     LAM = subparsers.add_parser("LAM",
                                 description='Dataset parser for training on LAM',
                                 add_help=True,
@@ -157,26 +173,11 @@ def get_args_parser():
    
     RIMES.add_argument('--nb-cls', default=166, type=int, help='nb of classes, IAM=79+1, READ2016=89+1')
     
-    
+    return parser
 
-    # First parse defaults and CLI to detect explicit CLI overrides
-    defaults = parser.parse_args([])
-    args = parser.parse_args()
 
-    # Keys explicitly provided on CLI (different from defaults) will be frozen
-    frozen_keys = set()
-    for k, v in vars(args).items():
-        if not hasattr(defaults, k):
-            continue
-        dv = getattr(defaults, k)
-        if v != dv:
-            frozen_keys.add(k)
-    # config itself should not be a frozen key for downstream mapping
-    frozen_keys.discard('config')
+def get_args_parser():
+    parser = get_parser()
+    return parser.parse_args()
 
-    # Load and apply config if provided, honoring CLI overrides
-    if getattr(args, 'config', None):
-        cfg = _load_yaml_config(args.config)
-        args = _apply_config_to_args(cfg, args, frozen_keys=frozen_keys)
 
-    return args

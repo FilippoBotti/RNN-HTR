@@ -15,7 +15,8 @@ from tqdm import tqdm
 from data.LAM.utils import dummy_main
 from torchvision.transforms import ToTensor
 from data.RIMES import build_RIMES
-
+import pickle
+from pathlib import Path
 import time
 import uuid
 
@@ -52,7 +53,7 @@ def main():
     model_ema = utils.ModelEma(model, args.ema_decay)
     model.zero_grad()
     logger.info(model)
-    if args.subcommand in ['READ', 'IAM']:
+    if args.subcommand in ['READ', 'IAM', 'CASIA']:
         logger.info('Loading train loader...')
         train_dataset = dataset.myLoadDS(args.train_data_list, args.data_path, args.img_size)
         train_loader = torch.utils.data.DataLoader(train_dataset,
@@ -81,7 +82,20 @@ def main():
         else:
             optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.99), weight_decay=args.weight_decay)
         criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True)
-        converter = utils.CTCLabelConverter(train_dataset.ralph.values())
+        if args.subcommand == "CASIA":
+            charset_path = Path(args.data_path).parent / "charset.pkl"
+
+            with open(charset_path, "rb") as f:
+                charset = pickle.load(f)
+
+            converter = utils.CTCLabelConverter(charset)
+
+            print(f"[CASIA] Loaded charset from {charset_path}")
+            print(f"[CASIA] charset size: {len(charset)}")
+            print(f"[CASIA] nb_cls expected: {len(charset) + 1}")
+            print(f"[CASIA] contains 遵: {'遵' in charset}")
+        else:
+            converter = utils.CTCLabelConverter(train_dataset.ralph.values())
         
     elif args.subcommand == 'LAM':
         logger.info('Loading train loader...')

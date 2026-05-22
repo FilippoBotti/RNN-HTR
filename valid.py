@@ -44,7 +44,6 @@ def validation(model, criterion, evaluation_loader, converter):
         preds_index = preds_index.transpose(1, 0).contiguous().view(-1)
         preds_str = converter.decode(preds_index.data, preds_size.data)
 
-
         # Visualize each image with its corresponding label and prediction
         # if os.path.exists('./results') is False:
         #     os.makedirs('./results')
@@ -65,6 +64,7 @@ def validation(model, criterion, evaluation_loader, converter):
         all_preds_str.extend(preds_str)
         all_labels.extend(labels)
 
+        
         for pred_cer, gt_cer in zip(preds_str, labels):
             tmp_ED = editdistance.eval(pred_cer, gt_cer)
             if len(gt_cer) == 0:
@@ -88,9 +88,10 @@ def validation(model, criterion, evaluation_loader, converter):
 
             tot_ED_wer += tmp_ED_wer
             length_of_gt_wer += len(gt_wer)
+        
 
     val_loss = valid_loss / count
     CER = tot_ED / float(length_of_gt)
     WER = tot_ED_wer / float(length_of_gt_wer)
 
-    return val_loss, CER, WER, preds_str, labels
+    return val_loss, CER, WER, all_preds_str, all_labels

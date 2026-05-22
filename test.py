@@ -13,8 +13,8 @@ from data.LAM.utils.dummy_main import LAM
 from torchvision.transforms import ToTensor
 from data.misc import collate_fn
 from data.RIMES import build_RIMES
-from data.PONTALTO.pontalto import PONTALTO
-
+from pathlib import Path
+import pickle
 def main():
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -43,7 +43,7 @@ def main():
     model.load_state_dict(model_dict, strict=True)
     model = model.cuda()
 
-    if args.subcommand in ['READ', 'IAM']:
+    if args.subcommand in ['READ', 'IAM', 'CASIA']:
         logger.info('Loading test loader...')
         train_dataset = dataset.myLoadDS(args.train_data_list, args.data_path, args.img_size)
 
@@ -53,8 +53,20 @@ def main():
                                                 shuffle=False,
                                                 pin_memory=True,
                                                 num_workers=args.num_workers)
+        if args.subcommand == "CASIA":
+            charset_path = Path(args.data_path).parent / "charset.pkl"
 
-        converter = utils.CTCLabelConverter(train_dataset.ralph.values())
+            with open(charset_path, "rb") as f:
+                charset = pickle.load(f)
+
+            converter = utils.CTCLabelConverter(charset)
+
+            print(f"[CASIA] Loaded charset from {charset_path}")
+            print(f"[CASIA] charset size: {len(charset)}")
+            print(f"[CASIA] nb_cls expected: {len(charset) + 1}")
+            print(f"[CASIA] contains 遵: {'遵' in charset}")
+        else:
+            converter = utils.CTCLabelConverter(train_dataset.ralph.values())
         criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True).to(device)
         
     elif args.subcommand == 'LAM':
@@ -84,6 +96,10 @@ def main():
                                                                      criterion,
                                                                      test_loader,
                                                                      converter)
+        for p, l in list(zip(preds, labels))[:30]:
+            logger.info("PRED: %s", p)
+            logger.info("TRUE: %s", l)
+            logger.info("-" * 80)
 
     logger.info(
         f'Test. loss : {val_loss:0.3f} \t CER : {val_cer:0.4f} \t WER : {val_wer:0.4f} ')
@@ -109,6 +125,10 @@ def main():
                                                                      criterion,
                                                                      test_loader,
                                                                      converter)
+        for p, l in list(zip(preds, labels))[:30]:
+            logger.info("PRED: %s", p)
+            logger.info("TRUE: %s", l)
+            logger.info("-" * 80)
 
     logger.info(
         f'Test. loss : {val_loss:0.3f} \t CER : {val_cer:0.4f} \t WER : {val_wer:0.4f} ')

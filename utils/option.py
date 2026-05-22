@@ -22,6 +22,11 @@ def get_parser():
     parser.add_argument('--mamba_scan_type', type=str, default='bidi', choices=['single', 'double', 'quad'],
                        help='Scan type for the model, single for single direction, double for double direction')
     
+    # rebuttal
+    parser.add_argument('--swin_window', default=8, type=int, help='Dimension of the window for swin transformer')
+    
+    
+    
     parser.add_argument('--mask-version', default=0, type=int, help='mask version used for training (0 = legacy)')
     parser.add_argument('--use-masking', action='store_true', default=False, help='whether to use masking during training')
     parser.add_argument('--use-shuffle', action='store_true', default=False, help='whether to use masking during training')
@@ -29,7 +34,7 @@ def get_parser():
     parser.add_argument('--out-dir', type=str, default='./output', help='output directory')
     parser.add_argument('--use-sam', action='store_true', default=False, help='whether to use SAM optimizer')
     parser.add_argument('--train-bs', default=8, type=int, help='train batch size')
-    parser.add_argument('--architecture', type=str, choices=['mamba', 'transformer', 'bidimamba', 'bilstm'], default='mamba', help='Use mamba, transformer, or RWKV architecture')
+    parser.add_argument('--architecture', type=str, choices=['mamba', 'transformer', 'bidimamba', 'bilstm', 'swin'], default='mamba', help='Use mamba, transformer, or RWKV architecture')
     parser.add_argument('--val-bs', default=1, type=int, help='validation batch size')
     parser.add_argument('--num-workers', default=8, type=int, help='nb of workers')
     parser.add_argument('--eval-iter', default=1000, type=int, help='nb of iterations to run evaluation')

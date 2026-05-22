@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from timm.models.vision_transformer import Mlp, DropPath
 
 import numpy as np
-from model import resnet18, bidi_mamba, bilstm
+from model import resnet18, bidi_mamba, bilstm, swin_transformer
 from functools import partial
 
 
@@ -202,6 +202,22 @@ class MaskedAutoencoderViT(nn.Module):
                 Block(embed_dim, num_heads, self.num_patches,
                       mlp_ratio, qkv_bias=True, norm_layer=norm_layer, args=args)
                 for i in range(depth)])
+        # --------------------------------------------------------------------------
+        # REBUTTAL
+        elif args.architecture == 'swin':
+            self.blocks = nn.ModuleList([
+                swin_transformer.SwinTransformerBlock(
+                    dim=embed_dim,
+                    input_resolution=self.num_patches,
+                    num_heads=num_heads,
+                    window_size=self.args.swin_window,
+                    shift_size=0 if (i % 2 == 0) else args.swin_window // 2,
+                    mlp_ratio=mlp_ratio,
+                    qkv_bias=True,
+                    norm_layer=norm_layer
+                )
+            for i in range(depth)])
+        # --------------------------------------------------------------------------
         elif args.architecture == 'bidimamba':
             self.blocks = nn.ModuleList([
                 bidi_mamba.BiMambaBlock(

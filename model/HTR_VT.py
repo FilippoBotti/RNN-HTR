@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from timm.models.vision_transformer import Mlp, DropPath
 
 import numpy as np
-from model import resnet18, bidi_mamba, bilstm, swin_transformer
+from model import resnet18, bidi_mamba, bilstm, swin_transformer, longformer
 from functools import partial
 
 
@@ -215,6 +215,21 @@ class MaskedAutoencoderViT(nn.Module):
                     mlp_ratio=mlp_ratio,
                     qkv_bias=True,
                     norm_layer=norm_layer
+                )
+            for i in range(depth)])
+        elif args.architecture == 'longformer':
+            self.blocks = nn.ModuleList([
+                longformer.LongformerBlock(
+                    dim=embed_dim,
+                    num_heads=num_heads,
+                    window_size=args.window_size,  # e.g. 17 or 33
+                    mlp_ratio=mlp_ratio,
+                    qkv_bias=True,
+                    drop=0.0,
+                    attn_drop=0.0,
+                    drop_path=args.drop_path[i] if isinstance(args.drop_path, list) else args.drop_path,
+                    norm_layer=norm_layer,
+                    args=args,
                 )
             for i in range(depth)])
         # --------------------------------------------------------------------------

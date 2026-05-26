@@ -24,6 +24,7 @@ def get_parser():
     
     # rebuttal
     parser.add_argument('--swin_window', default=8, type=int, help='Dimension of the window for swin transformer')
+    parser.add_argument('--longformer_window', default=17, type=int, help='Dimension of the window for longformer')
     
     
     

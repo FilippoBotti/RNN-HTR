@@ -357,11 +357,10 @@ def add_benchmark_args(parser):
     )
 
     parser.add_argument(
-        "--benchmark-checkpoints",
-        nargs="+",
+        "--checkpoint-name",
         type=str,
-        default=["best_CER.pth", "best_WER.pth"],
-        help="Checkpoint filenames inside save_dir.",
+        default="best_CER.pth",
+        help="Checkpoint filename inside save_dir. Default: best_CER.pth",
     )
 
     parser.add_argument(
@@ -419,7 +418,6 @@ def main():
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(args.seed)
 
-    # Optional but usually good for deployment-style benchmarking.
     if torch.cuda.is_available():
         torch.backends.cudnn.benchmark = True
         torch.backends.cuda.matmul.allow_tf32 = True
@@ -446,117 +444,116 @@ def main():
 
     all_rows = []
 
-    for ckpt_name in args.benchmark_checkpoints:
-        ckpt_path = os.path.join(args.save_dir, ckpt_name)
+    ckpt_name = args.checkpoint_name
+    ckpt_path = os.path.join(args.save_dir, ckpt_name)
 
-        if not os.path.exists(ckpt_path):
-            logger.warning(f"Checkpoint not found, skipping: {ckpt_path}")
-            continue
+    if not os.path.exists(ckpt_path):
+        raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
 
-        model = HTR_VT.create_model(
-            nb_cls=args.nb_cls,
-            img_size=args.img_size[::-1],
-            args=args,
+    model = HTR_VT.create_model(
+        nb_cls=args.nb_cls,
+        img_size=args.img_size[::-1],
+        args=args,
+    )
+
+    model = load_checkpoint(model, ckpt_path, logger=logger)
+    model = model.to(device)
+    model.eval()
+
+    params = count_parameters(model)
+
+    logger.info("=" * 80)
+    logger.info(f"Checkpoint: {ckpt_name}")
+    logger.info(f"Architecture: {args.architecture}")
+    logger.info(f"Head type: {args.head_type}")
+    logger.info(f"Depth: {args.depth}")
+    logger.info(f"Params: {params:,}")
+    logger.info(f"Precision: {precision}")
+    logger.info("=" * 80)
+
+    for bs in args.benchmark_batch_sizes:
+        logger.info(f"Running forward benchmark with batch size {bs}")
+
+        loader, converter, criterion = build_loader_and_converter(
+            args,
+            device,
+            batch_size=bs,
         )
 
-        model = load_checkpoint(model, ckpt_path, logger=logger)
-        model = model.to(device)
-        model.eval()
-
-        params = count_parameters(model)
-
-        logger.info("=" * 80)
-        logger.info(f"Checkpoint: {ckpt_name}")
-        logger.info(f"Architecture: {args.architecture}")
-        logger.info(f"Head type: {args.head_type}")
-        logger.info(f"Depth: {args.depth}")
-        logger.info(f"Params: {params:,}")
-        logger.info(f"Precision: {precision}")
-        logger.info("=" * 80)
-
-        for bs in args.benchmark_batch_sizes:
-            logger.info(f"Running forward benchmark with batch size {bs}")
-
-            loader, converter, criterion = build_loader_and_converter(
-                args,
-                device,
-                batch_size=bs,
-            )
-
-            cold_ms = None
-            if args.measure_cold_start:
-                cold_ms = measure_cold_start(
-                    model,
-                    loader,
-                    device,
-                    args,
-                )
-
-                logger.info(
-                    f"Cold start | bs={bs} | {cold_ms:.4f} ms/line"
-                )
-
-            forward_stats = benchmark_forward_only(
+        cold_ms = None
+        if args.measure_cold_start:
+            cold_ms = measure_cold_start(
                 model,
                 loader,
                 device,
                 args,
-                warmup_batches=args.warmup_batches,
-                timed_batches=args.timed_batches,
             )
-
-            row = {
-                "dataset": args.subcommand,
-                "checkpoint": ckpt_name,
-                "architecture": args.architecture,
-                "head_type": args.head_type,
-                "depth": args.depth,
-                "batch_size": bs,
-                "params": params,
-                "precision": precision,
-                "amp": args.amp,
-                "bf16": args.bf16,
-                "cold_start_ms_per_line": cold_ms,
-            }
-
-            row.update(forward_stats)
 
             logger.info(
-                f"Forward | ckpt={ckpt_name} | bs={bs} | precision={precision} | "
-                f"{forward_stats['forward_ms_per_line']:.4f} ms/line | "
-                f"{forward_stats['forward_lines_per_sec']:.2f} lines/s | "
-                f"peak={forward_stats['forward_peak_allocated_mb']:.2f} MB"
+                f"Cold start | bs={bs} | {cold_ms:.4f} ms/line"
             )
 
-            if (not args.skip_e2e) and (bs in args.validation_batch_sizes):
-                logger.info(f"Running end-to-end validation with batch size {bs}")
+        forward_stats = benchmark_forward_only(
+            model,
+            loader,
+            device,
+            args,
+            warmup_batches=args.warmup_batches,
+            timed_batches=args.timed_batches,
+        )
 
-                e2e_stats = benchmark_end_to_end(
-                    model,
-                    criterion,
-                    loader,
-                    converter,
-                    device,
-                    args,
-                )
+        row = {
+            "dataset": args.subcommand,
+            "checkpoint": ckpt_name,
+            "architecture": args.architecture,
+            "head_type": args.head_type,
+            "depth": args.depth,
+            "batch_size": bs,
+            "params": params,
+            "precision": precision,
+            "amp": args.amp,
+            "bf16": args.bf16,
+            "cold_start_ms_per_line": cold_ms,
+        }
 
-                row.update(e2e_stats)
+        row.update(forward_stats)
 
-                logger.info(
-                    f"E2E | ckpt={ckpt_name} | bs={bs} | precision={precision} | "
-                    f"CER={e2e_stats['cer']:.4f} | "
-                    f"WER={e2e_stats['wer']:.4f} | "
-                    f"{e2e_stats['e2e_ms_per_line']:.4f} ms/line | "
-                    f"{e2e_stats['e2e_lines_per_sec']:.2f} lines/s | "
-                    f"peak={e2e_stats['e2e_peak_allocated_mb']:.2f} MB"
-                )
+        logger.info(
+            f"Forward | ckpt={ckpt_name} | bs={bs} | precision={precision} | "
+            f"{forward_stats['forward_ms_per_line']:.4f} ms/line | "
+            f"{forward_stats['forward_lines_per_sec']:.2f} lines/s | "
+            f"peak={forward_stats['forward_peak_allocated_mb']:.2f} MB"
+        )
 
-            all_rows.append(row)
+        if (not args.skip_e2e) and (bs in args.validation_batch_sizes):
+            logger.info(f"Running end-to-end validation with batch size {bs}")
 
-        del model
+            e2e_stats = benchmark_end_to_end(
+                model,
+                criterion,
+                loader,
+                converter,
+                device,
+                args,
+            )
 
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+            row.update(e2e_stats)
+
+            logger.info(
+                f"E2E | ckpt={ckpt_name} | bs={bs} | precision={precision} | "
+                f"CER={e2e_stats['cer']:.4f} | "
+                f"WER={e2e_stats['wer']:.4f} | "
+                f"{e2e_stats['e2e_ms_per_line']:.4f} ms/line | "
+                f"{e2e_stats['e2e_lines_per_sec']:.2f} lines/s | "
+                f"peak={e2e_stats['e2e_peak_allocated_mb']:.2f} MB"
+            )
+
+        all_rows.append(row)
+
+    del model
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     os.makedirs(args.output_path, exist_ok=True)
 

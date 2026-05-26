@@ -222,7 +222,7 @@ class MaskedAutoencoderViT(nn.Module):
                 longformer.LongformerBlock(
                     dim=embed_dim,
                     num_heads=num_heads,
-                    window_size=args.window_size,  # e.g. 17 or 33
+                    window_size=args.longformer_window,  # e.g. 17 or 33
                     mlp_ratio=mlp_ratio,
                     qkv_bias=True,
                     drop=0.0,
